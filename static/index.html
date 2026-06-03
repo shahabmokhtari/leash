@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Leash</title>
+    <script>(function(){var t=localStorage.getItem('cpa-theme');if(t)document.documentElement.setAttribute('data-theme',t);else if(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.setAttribute('data-theme','dark');})()</script>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <a href="#main" class="skip-link">Skip to main content</a>
+
+    <div class="container">
+        <header>
+            <div class="header-brand"><h1>Leash</h1><span class="motto">Leash the Harness</span></div>
+            <div class="header-right">
+                <div class="status" role="status" aria-label="Service connection status">
+                    <span class="status-indicator" aria-hidden="true"></span>
+                    <span class="status-label">Checking...</span>
+                </div>
+                <button id="btnAutoStart" class="btn-autostart" title="Toggle auto-start (SessionStart hook)" aria-label="Toggle auto-start">&#x23F5;</button>
+                <button id="btnShutdown" class="btn-shutdown" title="Shut down Leash server" aria-label="Shut down Leash server">&#x23FB;</button>
+                <button id="themeToggle" class="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode (D)">&#9790;</button>
+            </div>
+        </header>
+
+        <nav aria-label="Main navigation" role="navigation">
+            <a href="/" class="active" aria-current="page">Dashboard</a>
+            <a href="/logs.html">Live Logs</a>
+            <a href="/transcripts.html">Transcripts</a>
+            <a href="/prompts.html">Prompt Editor</a>
+            <a href="/config.html">Leash Settings</a>
+            <a href="/claude-settings.html">Claude Settings</a>
+            <a href="/copilot-settings.html">Copilot Settings</a>
+        </nav>
+
+        <main id="main">
+            <!-- Warning banner for user-uninstalled hooks -->
+            <div id="hooksWarningBanner" class="hooks-warning-banner" style="display:none">
+                <span class="hooks-warning-icon">&#9888;</span>
+                Hooks are not installed because you previously uninstalled them. Claude Code sessions are not being monitored.
+                <button id="hooksWarningInstall" class="hooks-warning-btn">Re-install Hooks</button>
+            </div>
+
+            <!-- Profile Switcher (Creative) -->
+            <section class="profile-switcher">
+                <h2>Security Profile</h2>
+                <p style="font-size:0.85em;color:var(--text-muted);margin-bottom:12px;">Selects which threshold set is used from each hook handler's config (S/M/P values on Configuration page).</p>
+                <div class="profile-cards" id="profileCards" style="grid-template-columns:repeat(5,1fr);">
+                    <div class="profile-card" data-profile="trust">
+                        <div class="profile-icon">&#x1f91d;</div>
+                        <div class="profile-name">Trust</div>
+                        <div class="profile-desc">Blocks only dangerous ops</div>
+                    </div>
+                    <div class="profile-card" data-profile="permissive">
+                        <div class="profile-icon">&#x26a1;</div>
+                        <div class="profile-name">Permissive</div>
+                        <div class="profile-desc">Low friction</div>
+                    </div>
+                    <div class="profile-card active" data-profile="moderate">
+                        <div class="profile-icon">&#x2696;</div>
+                        <div class="profile-name">Moderate</div>
+                        <div class="profile-desc">Balanced security</div>
+                    </div>
+                    <div class="profile-card" data-profile="strict">
+                        <div class="profile-icon">&#x1f6e1;</div>
+                        <div class="profile-name">Strict</div>
+                        <div class="profile-desc">High security</div>
+                    </div>
+                    <div class="profile-card" data-profile="lockdown">
+                        <div class="profile-icon">&#x1f512;</div>
+                        <div class="profile-name">Lockdown</div>
+                        <div class="profile-desc">No auto-approve</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Enforcement Mode Selector -->
+            <section class="enforcement-section" id="enforcementSection">
+                <h2>Enforcement Mode</h2>
+                <div class="enforcement-track">
+                    <div class="enforcement-connector"><div class="enforcement-connector-fill" id="enforcementConnectorFill"></div></div>
+                    <div class="enforcement-modes">
+                        <div class="enforcement-mode-card" data-mode="observe" id="modeObserve">
+                            <div class="enforcement-mode-indicator"></div>
+                            <div class="enforcement-mode-icon">&#x1f441;</div>
+                            <div class="enforcement-mode-name">Observe</div>
+                            <div class="enforcement-mode-desc">Log only &mdash; no decisions. Claude asks the user as normal.</div>
+                            <label id="observeAnalyzeToggle" class="observe-analyze-toggle" style="display:none;margin-top:6px;font-size:0.8em;cursor:pointer;user-select:none;color:var(--text-secondary,#555);">
+                                <input type="checkbox" id="chkAnalyzeInObserve" checked> LLM analysis
+                            </label>
+                        </div>
+                        <div class="enforcement-mode-card" data-mode="approve-only" id="modeApproveOnly">
+                            <div class="enforcement-mode-indicator"></div>
+                            <div class="enforcement-mode-icon">&#x2714;</div>
+                            <div class="enforcement-mode-name">Approve Only</div>
+                            <div class="enforcement-mode-desc">Auto-approve safe requests. Uncertain ones fall through to the user.</div>
+                        </div>
+                        <div class="enforcement-mode-card" data-mode="enforce" id="modeEnforce">
+                            <div class="enforcement-mode-indicator"></div>
+                            <div class="enforcement-mode-icon">&#x1f6e1;</div>
+                            <div class="enforcement-mode-name">Enforce</div>
+                            <div class="enforcement-mode-desc">Full control &mdash; approve safe requests, deny dangerous ones.</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Hooks Management -->
+            <section class="hooks-section">
+                <h2>Hook Management</h2>
+                <div class="hooks-controls">
+                    <div class="hook-control-card">
+                        <div class="hook-control-header">
+                            <span class="hook-control-label">Claude Hooks</span>
+                            <span class="hook-status-badge" id="hookInstalledBadge">Checking...</span>
+                        </div>
+                        <p class="hook-control-desc">Install/remove hooks in Claude Code and Copilot CLI</p>
+                        <button class="btn" id="btnToggleHooks" disabled>Loading...</button>
+                    </div>
+                    <div class="hook-control-card copilot-card">
+                        <div class="hook-control-header">
+                            <span class="hook-control-label">Copilot Hooks</span>
+                            <span class="hook-status-badge" id="copilotInstalledBadge">Checking...</span>
+                        </div>
+                        <p class="hook-control-desc">Install/remove hooks for GitHub Copilot CLI</p>
+                        <button class="btn" id="btnToggleCopilotHooks" disabled>Loading...</button>
+                    </div>
+                    <div class="hook-combined-actions" style="grid-column: 1 / -1; text-align: center; padding-top: 8px;">
+                        <button class="btn btn-primary" id="btnInstallAllHooks">Install All Hooks</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Stats -->
+            <section class="stats" aria-label="Statistics overview">
+                <div class="stat-card success loading" role="group" aria-label="Auto-approved today">
+                    <h3>Auto-Approved Today</h3>
+                    <div class="stat-value" id="autoApprovedCount" aria-live="polite">--</div>
+                </div>
+                <div class="stat-card danger loading" role="group" aria-label="Denied today">
+                    <h3>Denied Today</h3>
+                    <div class="stat-value" id="deniedCount" aria-live="polite">--</div>
+                </div>
+                <div class="stat-card loading" role="group" aria-label="Active sessions">
+                    <h3>Active Sessions</h3>
+                    <div class="stat-value" id="activeSessionCount" aria-live="polite">--</div>
+                </div>
+                <div class="stat-card warning loading" role="group" aria-label="Average safety score">
+                    <h3>Avg Safety Score</h3>
+                    <div class="stat-value" id="avgSafetyScore" aria-live="polite">--</div>
+                </div>
+            </section>
+
+            <div id="statsError"></div>
+
+            <!-- Latency Stats -->
+            <section id="latencySection" style="margin-bottom:20px;">
+                <div class="card-header"><h3>Hook Response Latency</h3></div>
+                <div id="latencyContent" style="font-size:0.85em;color:var(--text-secondary);">Loading...</div>
+            </section>
+
+            <!-- Insights Panel (Creative) -->
+            <section class="insights-panel" id="insightsPanel">
+                <h2>Insights <span class="insight-count" id="insightCount">0</span></h2>
+                <div id="insightsList" class="insights-list">
+                    <p class="empty-state">Gathering data for insights...</p>
+                </div>
+            </section>
+
+            <section class="charts-section" aria-label="Charts">
+                <div class="chart-card">
+                    <h3>Approval Trends (7 Days)</h3>
+                    <div class="bar-chart" id="trendChart" role="img" aria-label="Bar chart showing approval and denial trends over the past 7 days">
+                        <div class="empty-state"><p>Loading trends...</p></div>
+                    </div>
+                    <div class="chart-legend" style="margin-top: 12px;">
+                        <span class="legend-item"><span class="legend-dot safe" aria-hidden="true"></span> Approved</span>
+                        <span class="legend-item"><span class="legend-dot risky" aria-hidden="true"></span> Denied</span>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <h3>Score Distribution</h3>
+                    <div class="donut-chart" id="scoreDonut" role="img" aria-label="Donut chart showing safety score distribution">
+                        <div class="donut-center">--<small>events</small></div>
+                    </div>
+                    <div class="chart-legend">
+                        <span class="legend-item"><span class="legend-dot safe" aria-hidden="true"></span> Safe (<span id="safeCount">0</span>)</span>
+                        <span class="legend-item"><span class="legend-dot cautious" aria-hidden="true"></span> Cautious (<span id="cautiousCount">0</span>)</span>
+                        <span class="legend-item"><span class="legend-dot risky" aria-hidden="true"></span> Risky (<span id="riskyCount">0</span>)</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Adaptive Thresholds (Creative) -->
+            <section class="adaptive-section">
+                <h2>Adaptive Thresholds</h2>
+                <div id="adaptiveStats" class="adaptive-grid">
+                    <p class="empty-state">No tool data yet</p>
+                </div>
+            </section>
+
+            <!-- Recent activity removed - use Live Logs page instead -->
+        </main>
+    </div>
+
+    <!-- Toast container -->
+    <div id="toastContainer" class="toast-container" role="status" aria-live="polite"></div>
+
+    <!-- Keyboard Shortcuts Modal -->
+    <div id="shortcutsModal" class="modal-overlay" role="dialog" aria-label="Keyboard shortcuts" aria-modal="true">
+        <div class="modal">
+            <h2>Keyboard Shortcuts</h2>
+            <ul class="shortcut-list">
+                <li class="shortcut-item">
+                    <span>Toggle dark mode</span>
+                    <span class="shortcut-key"><kbd>D</kbd></span>
+                </li>
+                <li class="shortcut-item">
+                    <span>Refresh data</span>
+                    <span class="shortcut-key"><kbd>R</kbd></span>
+                </li>
+                <li class="shortcut-item">
+                    <span>Go to Dashboard</span>
+                    <span class="shortcut-key"><kbd>1</kbd></span>
+                </li>
+                <li class="shortcut-item">
+                    <span>Go to Logs</span>
+                    <span class="shortcut-key"><kbd>2</kbd></span>
+                </li>
+                <li class="shortcut-item">
+                    <span>Go to Configuration</span>
+                    <span class="shortcut-key"><kbd>3</kbd></span>
+                </li>
+                <li class="shortcut-item">
+                    <span>Toggle terminal</span>
+                    <span class="shortcut-key"><kbd>T</kbd></span>
+                </li>
+                <li class="shortcut-item">
+                    <span>Show shortcuts</span>
+                    <span class="shortcut-key"><kbd>?</kbd></span>
+                </li>
+                <li class="shortcut-item">
+                    <span>Close modal</span>
+                    <span class="shortcut-key"><kbd>Esc</kbd></span>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="/js/shared.js"></script>
+    <script src="/js/dashboard.js"></script>
+</body>
+</html>

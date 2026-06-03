@@ -1,0 +1,2193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transcripts - Leash</title>
+    <script>(function(){var t=localStorage.getItem('cpa-theme');if(t)document.documentElement.setAttribute('data-theme',t);else if(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.setAttribute('data-theme','dark');})()</script>
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        .project-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+        .project-card {
+            background: var(--bg-secondary, #fff); border: 1px solid var(--border-color, #e0e0e0);
+            border-radius: 8px; padding: 12px 16px; cursor: pointer; transition: border-color 0.2s;
+        }
+        .project-card:hover { border-color: var(--accent-primary, #2563eb); }
+        .project-card.active { border-color: var(--accent-primary, #2563eb); background: var(--accent-primary-bg, #eff6ff); }
+        .project-name { font-weight: 600; font-size: 0.95em; color: var(--text-primary, #1a1a2e); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .project-meta { font-size: 0.8em; color: var(--text-muted, #666); margin-top: 4px; }
+        .project-path { font-size: 0.75em; color: var(--text-muted, #888); margin-top: 2px; font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .badge-copilot { font-size: 0.65em; font-weight: 700; background: #1f6feb; color: #fff; padding: 1px 5px; border-radius: 3px; }
+        .badge-git { font-size: 0.65em; font-weight: 600; background: var(--bg-tertiary, #e5e7eb); color: var(--text-secondary, #555); padding: 1px 5px; border-radius: 3px; }
+        .badge-repo { font-size: 0.65em; font-weight: 600; background: var(--bg-tertiary, #e5e7eb); color: var(--text-secondary, #555); padding: 1px 5px; border-radius: 3px; }
+        .session-provider { font-size: 0.7em; font-weight: 700; padding: 1px 5px; border-radius: 3px; display: inline-block; }
+        .session-provider.claude { background: #d97706; color: #fff; }
+        .session-provider.copilot { background: #1f6feb; color: #fff; }
+
+        .sessions-table { width: 100%; border-collapse: collapse; }
+        .sessions-table th, .sessions-table td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border-color, #e0e0e0); color: var(--text-primary, #1a1a2e); }
+        .sessions-table th { font-size: 0.8em; text-transform: uppercase; color: var(--text-muted, #666); }
+        .sessions-table tr { cursor: pointer; transition: background 0.15s; }
+        .sessions-table tbody tr:hover { background: var(--bg-hover, #f5f5f5); }
+        .session-size { font-size: 0.85em; color: var(--text-muted, #666); }
+
+        .session-tree { display: flex; flex-direction: column; gap: 2px; }
+        .session-row {
+            display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px;
+            padding: 8px 12px; cursor: pointer; border-radius: 4px; transition: background 0.15s;
+            border-bottom: 1px solid var(--border-color, #e0e0e0);
+        }
+        .session-row:hover { background: var(--bg-hover, #f5f5f5); }
+        .session-row-line1 { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; }
+        .session-row-line2 { display: flex; align-items: center; gap: 12px; width: 100%; padding-left: 28px; }
+        .session-child { padding-left: 32px; }
+        .session-child .session-id-cell { font-size: 0.8em; }
+        .tree-toggle {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 20px; height: 20px; font-size: 0.8em; cursor: pointer;
+            color: var(--text-muted, #666); user-select: none; flex-shrink: 0;
+        }
+        .tree-toggle:hover { color: var(--text-primary, #1a1a2e); }
+        .tree-toggle-placeholder { width: 20px; flex-shrink: 0; }
+        .agent-badge {
+            font-size: 0.65em; font-weight: 600; background: #7c3aed; color: #fff;
+            padding: 1px 5px; border-radius: 3px; display: inline-block; margin-left: 4px;
+        }
+        .session-id-cell { font-family: monospace; font-size: 0.85em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .session-title { font-weight: 600; font-size: 0.9em; font-family: inherit; }
+        .session-guid { font-size: 0.75em; color: var(--text-muted, #888); font-family: monospace; }
+        .session-meta-cell { font-size: 0.85em; color: var(--text-muted, #666); white-space: nowrap; }
+
+        .token-usage-cell { font-size: 0.78em; color: var(--text-muted, #666); white-space: nowrap; font-family: monospace; }
+        .token-usage-cell .token-in { color: var(--color-info, #2563eb); }
+        .token-usage-cell .token-out { color: var(--color-success, #16a34a); }
+        .token-usage-cell .token-cache { color: var(--text-muted, #999); }
+        .token-loading { color: var(--text-muted, #aaa); font-style: italic; font-size: 0.78em; }
+        .token-summary {
+            display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px;
+            font-size: 0.75em; color: var(--text-muted, #666); font-family: monospace;
+        }
+        .token-summary .model-group { display: flex; gap: 6px; align-items: center; }
+        .token-summary .model-name { font-weight: 600; color: var(--text-secondary, #555); }
+        .project-tokens { font-size: 0.75em; color: var(--text-muted, #666); margin-top: 2px; font-family: monospace; }
+        .token-toggle { margin-bottom: 8px; }
+
+        .transcript-viewer {
+            display: flex; flex-direction: column; gap: 8px;
+            max-height: 70vh; overflow-y: auto; padding-right: 8px;
+            scroll-behavior: smooth;
+        }
+        .transcript-entry {
+            padding: 10px 14px; border-radius: 6px; font-size: 0.9em;
+            border-left: 3px solid var(--border-color, #ddd);
+            background: var(--bg-secondary, #fff); color: var(--text-primary, #1a1a2e);
+        }
+        .transcript-entry.type-user { border-left-color: var(--color-info, #2563eb); background: var(--color-info-bg, #eff6ff); }
+        .transcript-entry.type-assistant { border-left-color: var(--color-success, #16a34a); background: var(--color-success-bg, #f0fdf4); }
+        .transcript-entry.type-progress { border-left-color: var(--color-warning, #d97706); background: var(--color-warning-bg, #fffbeb); }
+        .transcript-entry.type-system { border-left-color: #7c3aed; background: var(--bg-tertiary, #f5f3ff); }
+        .transcript-entry.type-tool-result { border-left-color: #6b7280; background: var(--bg-tertiary, #f3f4f6); }
+        .transcript-entry .entry-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 4px; font-size: 0.8em; color: var(--text-muted, #666);
+        }
+        .transcript-entry .entry-type {
+            font-weight: 600; text-transform: uppercase; font-size: 0.75em;
+            padding: 2px 6px; border-radius: 3px; background: var(--bg-tertiary, #e5e7eb); color: var(--text-secondary, #444);
+        }
+        .transcript-entry .entry-content {
+            white-space: pre-wrap; word-break: break-word; font-family: inherit; line-height: 1.5;
+            color: var(--text-primary, #1a1a2e);
+        }
+        .transcript-entry .entry-content.md-rendered { white-space: normal; }
+        .transcript-entry .entry-content.md-rendered .md-code-block {
+            background: var(--bg-tertiary, #f3f4f6); padding: 10px 14px; border-radius: 6px;
+            overflow-x: auto; font-family: monospace; font-size: 0.9em; margin: 8px 0;
+            white-space: pre;
+        }
+        .transcript-entry .entry-content.md-rendered .md-inline-code {
+            background: var(--bg-tertiary, #f3f4f6); padding: 1px 4px; border-radius: 3px; font-family: monospace; font-size: 0.9em;
+        }
+        .transcript-entry .entry-content.md-rendered .md-h1 { font-size: 1.4em; font-weight: 700; margin: 12px 0 6px; }
+        .transcript-entry .entry-content.md-rendered .md-h2 { font-size: 1.2em; font-weight: 700; margin: 10px 0 5px; }
+        .transcript-entry .entry-content.md-rendered .md-h3 { font-size: 1.1em; font-weight: 600; margin: 8px 0 4px; }
+        .transcript-entry .entry-content.md-rendered .md-ul, .transcript-entry .entry-content.md-rendered .md-ol { margin: 4px 0 4px 20px; }
+        .transcript-entry .entry-content.md-rendered .md-p { margin: 4px 0; }
+        .transcript-entry .entry-content.md-rendered .md-hr { border: none; border-top: 1px solid var(--border-color, #ddd); margin: 8px 0; }
+        .transcript-entry .entry-content.md-rendered .md-link { color: var(--accent-primary, #2563eb); }
+        .transcript-entry .entry-content.truncated { max-height: 200px; overflow: hidden; position: relative; }
+        .transcript-entry .entry-content.truncated::after {
+            content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 40px;
+            background: linear-gradient(transparent, var(--bg-secondary, #fff));
+        }
+        .expand-btn { font-size: 0.8em; color: var(--accent-primary, #2563eb); cursor: pointer; border: none; background: none; padding: 4px 0; }
+
+        .two-panel { display: grid; grid-template-columns: 380px 1fr; gap: 20px; }
+        .sidebar-panel { max-height: 80vh; overflow-y: auto; }
+        @media (max-width: 960px) { .two-panel { grid-template-columns: 1fr; } }
+
+        /* Folder tree styles */
+        .folder-tree { display: flex; flex-direction: column; gap: 2px; }
+        .folder-tree-node { }
+        .folder-tree-label {
+            display: flex; align-items: center; gap: 6px; padding: 4px 8px;
+            cursor: pointer; border-radius: 4px; font-size: 0.85em; color: var(--text-secondary, #555);
+            user-select: none; transition: background 0.15s;
+        }
+        .folder-tree-label:hover { background: var(--bg-hover, #f0f0f0); }
+        .folder-tree-toggle { font-size: 0.7em; width: 16px; text-align: center; flex-shrink: 0; color: var(--text-muted, #888); }
+        .folder-tree-icon { flex-shrink: 0; }
+        .folder-tree-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .folder-tree-count { font-size: 0.8em; color: var(--text-muted, #888); margin-left: auto; white-space: nowrap; }
+        .folder-tree-children { padding-left: 16px; }
+        .folder-tree-children.collapsed { display: none; }
+        .calc-tokens-btn {
+            font-size: 0.75em; cursor: pointer; padding: 1px 5px; border-radius: 3px;
+            background: var(--bg-tertiary, #e5e7eb); color: var(--text-muted, #888);
+            margin-left: 4px; user-select: none; flex-shrink: 0;
+        }
+        .calc-tokens-btn:hover { background: var(--accent-primary, #2563eb); color: #fff; }
+        .folder-common-prefix { font-size: 0.75em; color: var(--text-muted, #888); font-family: monospace; padding: 4px 8px; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #folderDetailHeader {
+            background: var(--bg-secondary, #fff); border: 1px solid var(--border-color, #e0e0e0);
+            border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; display: none;
+        }
+        #folderDetailHeader .folder-detail-name { font-weight: 700; font-size: 1.05em; color: var(--text-primary, #1a1a2e); }
+        #folderDetailHeader .folder-detail-path { font-size: 0.78em; color: var(--text-muted, #888); font-family: monospace; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #folderDetailHeader .folder-detail-meta { font-size: 0.82em; color: var(--text-secondary, #555); margin-top: 4px; display: flex; gap: 12px; flex-wrap: wrap; }
+
+        .transcript-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+        .filter-chip {
+            font-size: 0.8em; padding: 4px 10px; border-radius: 12px; border: 1px solid var(--border-color, #ddd);
+            cursor: pointer; background: var(--bg-secondary, #fff); color: var(--text-primary, #1a1a2e); transition: all 0.15s;
+        }
+        .filter-chip.active { background: var(--accent-primary, #2563eb); color: #fff; border-color: var(--accent-primary, #2563eb); }
+        .entry-count { font-size: 0.85em; color: var(--text-muted, #666); margin-bottom: 8px; }
+
+        .tool-use-block { font-family: monospace; font-size: 0.85em; background: var(--bg-tertiary, #f3f4f6); padding: 8px 12px; border-radius: 4px; margin-top: 4px; white-space: pre-wrap; word-break: break-word; }
+        .tool-name-badge { font-weight: 700; display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 0.8em; background: var(--accent-primary, #2563eb); color: #fff; margin-right: 6px; }
+        .tool-result-block { font-family: monospace; font-size: 0.85em; background: var(--bg-tertiary, #f3f4f6); padding: 8px 12px; border-radius: 4px; margin-top: 4px; white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow-y: auto; }
+
+        .diff-table { width: 100%; border-collapse: collapse; font-family: monospace; font-size: 0.85em; margin-top: 6px; table-layout: fixed; }
+        .diff-table td { padding: 1px 8px; white-space: pre-wrap; word-break: break-word; vertical-align: top; border: none; }
+        .diff-line-num { width: 40px; min-width: 40px; text-align: right; color: var(--text-muted, #999); user-select: none; padding-right: 8px !important; opacity: 0.6; }
+        .diff-gutter { width: 1px; min-width: 1px; background: var(--border-color, #e0e0e0); padding: 0 !important; }
+        .diff-line-equal td.diff-code { background: transparent; color: var(--text-primary, #1a1a2e); }
+        .diff-line-deleted td.diff-code { background: var(--diff-removed-bg, rgba(244, 67, 54, 0.12)); color: var(--diff-removed-text, #c62828); }
+        .diff-line-deleted td.diff-line-num { background: var(--diff-removed-bg, rgba(244, 67, 54, 0.12)); }
+        .diff-line-inserted td.diff-code { background: var(--diff-added-bg, rgba(76, 175, 80, 0.12)); color: var(--diff-added-text, #2e7d32); }
+        .diff-line-inserted td.diff-line-num { background: var(--diff-added-bg, rgba(76, 175, 80, 0.12)); }
+        .diff-line-deleted td.diff-code.diff-line-empty,
+        .diff-line-deleted td.diff-line-num.diff-line-empty,
+        .diff-line-inserted td.diff-code.diff-line-empty,
+        .diff-line-inserted td.diff-line-num.diff-line-empty { background: var(--bg-tertiary, #f9fafb); color: inherit; }
+        .diff-header { display: flex; gap: 4px; margin-top: 6px; margin-bottom: 2px; }
+        .diff-header-side { flex: 1; font-size: 0.78em; font-weight: 600; text-transform: uppercase; padding: 3px 8px; border-radius: 3px 3px 0 0; }
+        .diff-header-old { margin-left: 40px; background: var(--diff-removed-bg, rgba(244, 67, 54, 0.12)); color: var(--color-danger, #dc2626); }
+        .diff-header-new { margin-left: 41px; background: var(--diff-added-bg, rgba(76, 175, 80, 0.12)); color: var(--color-success, #16a34a); }
+
+        .viewer-toolbar {
+            display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px;
+            padding: 8px 12px; background: var(--bg-secondary, #fff); border-radius: 6px;
+            border: 1px solid var(--border-color, #e0e0e0);
+        }
+        .viewer-toolbar .btn { font-size: 0.8em; padding: 4px 10px; }
+        .toggle-btn { display: inline-flex; align-items: center; gap: 4px; font-size: 0.8em; cursor: pointer; user-select: none; color: var(--text-primary, #1a1a2e); }
+        .toggle-btn input { margin: 0; }
+        .toolbar-sep { width: 1px; height: 20px; background: var(--border-color, #ddd); margin: 0 4px; }
+        .live-indicator { display: inline-flex; align-items: center; gap: 4px; font-size: 0.8em; color: var(--color-success, #16a34a); }
+        .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-success, #16a34a); animation: pulse-live 1.5s infinite; }
+        @keyframes pulse-live { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    </style>
+</head>
+<body>
+    <a href="#main" class="skip-link">Skip to main content</a>
+
+    <div class="container">
+        <header>
+            <div class="header-brand"><h1>Leash</h1><span class="motto">Leash the Harness</span></div>
+            <div class="header-right">
+                <div class="status" role="status" aria-label="Service connection status">
+                    <span class="status-indicator" aria-hidden="true"></span>
+                    <span class="status-label">Checking...</span>
+                </div>
+                <button id="btnAutoStart" class="btn-autostart" title="Toggle auto-start (SessionStart hook)" aria-label="Toggle auto-start">&#x23F5;</button>
+                <button id="btnShutdown" class="btn-shutdown" title="Shut down Leash server" aria-label="Shut down Leash server">&#x23FB;</button>
+                <button id="themeToggle" class="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode (D)">&#9790;</button>
+            </div>
+        </header>
+
+        <nav aria-label="Main navigation" role="navigation">
+            <a href="/">Dashboard</a>
+            <a href="/logs.html">Live Logs</a>
+            <a href="/transcripts.html" class="active" aria-current="page">Transcripts</a>
+            <a href="/prompts.html">Prompt Editor</a>
+            <a href="/config.html">Leash Settings</a>
+            <a href="/claude-settings.html">Claude Settings</a>
+            <a href="/copilot-settings.html">Copilot Settings</a>
+        </nav>
+
+        <main id="main">
+            <!-- Project/Session Browser -->
+            <section id="browserView">
+                <div class="card-header">
+                    <h2>Session Transcripts</h2>
+                    <button class="btn btn-sm" onclick="loadProjects()">Refresh</button>
+                </div>
+                <p style="margin-bottom:16px;color:var(--text-secondary,#666);font-size:0.9em;">
+                    Browse Claude Code and Copilot CLI session transcripts grouped by project folder.
+                </p>
+                <div class="two-panel">
+                    <div class="sidebar-panel">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                            <h3 style="margin:0;" id="sidebarTitle">Folders</h3>
+                            <label class="toggle-btn" style="font-size:0.78em;"><input type="checkbox" id="chkRepoView"> Repo view</label>
+                        </div>
+                        <div id="projectList" class="project-list">
+                            <div class="empty-state"><p>Loading projects...</p></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div id="folderDetailHeader"></div>
+                        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+                            <h3 style="margin:0;">Sessions</h3>
+                            <label class="toggle-btn" style="font-size:0.8em;"><input type="checkbox" id="chkTokenUsage"> Show token usage</label>
+                        </div>
+                        <div id="sessionTable">
+                            <div class="empty-state"><p>Select a project to view sessions</p></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Transcript Viewer -->
+            <section id="transcriptView" style="display:none;">
+                <div class="card-header">
+                    <h2><span id="transcriptTitle" style="font-size:0.85em;">Transcript</span> <span id="transcriptSessionId" style="font-size:0.6em;font-weight:normal;color:var(--text-muted,#888);font-family:monospace;">-</span></h2>
+                    <button class="btn btn-sm" onclick="backToBrowser()">Back to Browser</button>
+                </div>
+                <div id="transcriptFilePath" style="font-size:0.78em;color:var(--text-muted,#888);font-family:monospace;margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:none;" title=""></div>
+
+                <div class="viewer-toolbar">
+                    <label class="toggle-btn"><input type="checkbox" id="chkAutoScroll" checked> Auto-scroll</label>
+                    <span class="toolbar-sep"></span>
+                    <label class="toggle-btn"><input type="checkbox" id="chkMarkdown"> Render Markdown</label>
+                    <span class="toolbar-sep"></span>
+                    <label class="toggle-btn"><input type="checkbox" id="chkLive" checked> Live updates</label>
+                    <span class="live-indicator" id="liveIndicator" style="display:none;"><span class="live-dot"></span> Live</span>
+                    <span class="toolbar-sep"></span>
+                    <button class="btn btn-sm" onclick="exportTranscript('json')">Export JSON</button>
+                    <button class="btn btn-sm" onclick="exportTranscript('html')">Export HTML</button>
+                </div>
+
+                <div class="transcript-filters" id="transcriptFilters"></div>
+                <div class="entry-count" id="entryCount"></div>
+                <div class="transcript-viewer" id="transcriptContent">
+                    <div class="empty-state"><p>Loading transcript...</p></div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Toast container -->
+    <div id="toastContainer" class="toast-container" role="status" aria-live="polite"></div>
+
+    <script src="/js/shared.js"></script>
+    <script>
+        let allProjects = [];
+        let knownTypes = new Set();
+        let activeFilters = new Set();
+        let currentEntries = [];
+        let currentSessionId = null;
+        let sseSource = null;
+
+        // Token usage cache: sessionId -> { mtime, data }
+        var tokenUsageCache = {};
+        var tokenFetchAbort = null;
+
+        function formatTokenCount(n) {
+            if (n == null || n === 0) return '0';
+            if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+            if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+            return String(n);
+        }
+
+        function renderTokenCell(usage) {
+            if (!usage) return '<span class="token-loading">...</span>';
+            var t = usage.total || {};
+            var inp = (t.inputTokens || 0) + (t.cacheCreationTokens || 0) + (t.cacheReadTokens || 0);
+            var out = t.outputTokens || 0;
+            var tooltip = buildTokenTooltip(usage);
+            return '<span class="token-usage-cell" title="' + escapeHtml(tooltip) + '">' +
+                '<span class="token-in">' + formatTokenCount(inp) + ' in</span> ' +
+                '<span class="token-out">' + formatTokenCount(out) + ' out</span>' +
+                '</span>';
+        }
+
+        function buildTokenTooltip(usage) {
+            if (!usage) return '';
+            var lines = [];
+            var models = usage.models || {};
+            var keys = Object.keys(models);
+            if (keys.length > 0) {
+                for (var i = 0; i < keys.length; i++) {
+                    var m = models[keys[i]];
+                    var shortModel = keys[i].replace('claude-', '').replace(/-\d{8}$/, '');
+                    var mIn = (m.inputTokens || 0) + (m.cacheCreationTokens || 0) + (m.cacheReadTokens || 0);
+                    var mOut = m.outputTokens || 0;
+                    lines.push(shortModel + ': ' + formatTokenCount(mIn) + ' in / ' + formatTokenCount(mOut) + ' out');
+                }
+            }
+            var t = usage.total || {};
+            var totalIn = (t.inputTokens || 0) + (t.cacheCreationTokens || 0) + (t.cacheReadTokens || 0);
+            var totalOut = t.outputTokens || 0;
+            if (lines.length > 0) lines.push('---');
+            lines.push('Total: ' + formatTokenCount(totalIn) + ' in / ' + formatTokenCount(totalOut) + ' out');
+            if (t.cacheCreationTokens) lines.push('Cache write: ' + formatTokenCount(t.cacheCreationTokens));
+            if (t.cacheReadTokens) lines.push('Cache read: ' + formatTokenCount(t.cacheReadTokens));
+            return lines.join('\n');
+        }
+
+        function renderTokenDetails(usage) {
+            if (!usage || !usage.models) return '';
+            var models = usage.models;
+            var keys = Object.keys(models);
+            if (keys.length === 0) return '';
+            return keys.map(function(model) {
+                var m = models[model];
+                var shortModel = model.replace('claude-', '').replace(/-\d{8}$/, '');
+                return '<span class="model-group">' +
+                    '<span class="model-name">' + escapeHtml(shortModel) + ':</span> ' +
+                    '<span class="token-in">' + formatTokenCount(m.inputTokens) + 'in</span> ' +
+                    '<span class="token-out">' + formatTokenCount(m.outputTokens) + 'out</span>' +
+                    (m.cacheCreationTokens ? ' <span class="token-cache">' + formatTokenCount(m.cacheCreationTokens) + 'cw</span>' : '') +
+                    (m.cacheReadTokens ? ' <span class="token-cache">' + formatTokenCount(m.cacheReadTokens) + 'cr</span>' : '') +
+                    '</span>';
+            }).join(' ');
+        }
+
+        function aggregateTokenUsage(sessions) {
+            var total = { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0 };
+            var models = {};
+            var fetched = 0;
+            for (var i = 0; i < sessions.length; i++) {
+                var usage = tokenUsageCache[sessions[i].sessionId];
+                if (usage && usage.total) {
+                    total.inputTokens += usage.total.inputTokens || 0;
+                    total.outputTokens += usage.total.outputTokens || 0;
+                    total.cacheCreationTokens += usage.total.cacheCreationTokens || 0;
+                    total.cacheReadTokens += usage.total.cacheReadTokens || 0;
+                    fetched++;
+                    // Merge per-model
+                    var um = usage.models || {};
+                    var mk = Object.keys(um);
+                    for (var j = 0; j < mk.length; j++) {
+                        var mn = mk[j];
+                        if (!models[mn]) models[mn] = { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0 };
+                        models[mn].inputTokens += um[mn].inputTokens || 0;
+                        models[mn].outputTokens += um[mn].outputTokens || 0;
+                        models[mn].cacheCreationTokens += um[mn].cacheCreationTokens || 0;
+                        models[mn].cacheReadTokens += um[mn].cacheReadTokens || 0;
+                    }
+                }
+            }
+            return { total: total, models: models, fetched: fetched, sessionCount: sessions.length };
+        }
+
+        function renderProjectTokenSummary(sessions) {
+            var agg = aggregateTokenUsage(sessions);
+            if (agg.sessionCount === 0) return '';
+            var inp = agg.total.inputTokens + agg.total.cacheCreationTokens + agg.total.cacheReadTokens;
+            var partial = agg.fetched < agg.sessionCount ? ' (' + agg.fetched + '/' + agg.sessionCount + ')' : '';
+            var tooltip = buildTokenTooltip({ total: agg.total, models: agg.models });
+            return '<div class="project-tokens" title="' + escapeHtml(tooltip) + '">' + formatTokenCount(inp) + ' in / ' + formatTokenCount(agg.total.outputTokens) + ' out' + partial + '</div>';
+        }
+
+        async function fetchTokenUsage(sessionId) {
+            if (tokenUsageCache[sessionId]) return tokenUsageCache[sessionId];
+            try {
+                var resp = await fetch('/api/transcripts/token-usage/' + encodeURIComponent(sessionId));
+                if (!resp.ok) return null;
+                var data = await resp.json();
+                tokenUsageCache[sessionId] = data;
+                return data;
+            } catch (e) { return null; }
+        }
+
+        async function fetchAllTokenUsage(sessions) {
+            // Abort any previous batch
+            if (tokenFetchAbort) tokenFetchAbort.aborted = true;
+            var ctrl = { aborted: false };
+            tokenFetchAbort = ctrl;
+
+            // Collect all session IDs to fetch
+            var ids = sessions.map(function(s) { return s.sessionId; });
+
+            // Fetch in parallel batches of 6
+            for (var start = 0; start < ids.length; start += 6) {
+                var batch = ids.slice(start, start + 6);
+                await Promise.all(batch.map(function(sid) { return fetchTokenUsage(sid); }));
+                if (ctrl.aborted) return;
+                // Update UI incrementally
+                batch.forEach(function(sid) {
+                    var el = document.getElementById('tokens-' + sid);
+                    if (el) el.innerHTML = renderTokenCell(tokenUsageCache[sid]);
+                });
+                // Update project card token summary
+                updateProjectTokenSummary();
+            }
+        }
+
+        function updateProjectTokenSummary() {
+            var showTokens = document.getElementById('chkTokenUsage') && document.getElementById('chkTokenUsage').checked;
+            if (!showTokens) return;
+            // Update all project cards that have cached data
+            for (var idx = 0; idx < allProjects.length; idx++) {
+                var project = allProjects[idx];
+                if (!project) continue;
+                var el = document.getElementById('project-tokens-' + idx);
+                if (el) el.innerHTML = renderProjectTokenSummary(project.sessions || []);
+            }
+            // Update repo-level summaries if in repo view
+            updateRepoTokenSummaries();
+        }
+
+        var collapseIdCounter = 0;
+        function nextCollapseId() { return 'c' + (collapseIdCounter++); }
+        function toggleCollapse(id) {
+            var content = document.getElementById('collapse-' + id);
+            var toggle = document.getElementById('toggle-' + id);
+            if (!content || !toggle) return;
+            var isCollapsed = content.classList.contains('collapsed');
+            content.classList.toggle('collapsed', !isCollapsed);
+            toggle.textContent = isCollapsed ? '[-]' : '[+]';
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        }
+
+        function formatBytes(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function decodePath(encoded) {
+            return encoded.replace(/^([A-Z])--/, '$1:\\').replace(/-/g, '\\');
+        }
+
+        // --- Folder Tree Helpers ---
+
+        function buildFolderTree(projects) {
+            // Get display names and paths (folder view only)
+            var items = projects.map(function(p, i) {
+                var displayName = p.name || '';
+                var fullPath = p.cwd || p.path || '';
+                return { idx: i, displayName: displayName, fullPath: fullPath, project: p };
+            });
+
+            // Normalize paths (forward slashes, strip trailing slash)
+            var paths = items.map(function(it) {
+                return it.fullPath.replace(/\\/g, '/').replace(/\/$/, '');
+            });
+
+            // Build trie from filesystem root — every path segment is a node
+            var root = { name: '', children: {}, projects: [], fullPath: '' };
+            for (var i = 0; i < items.length; i++) {
+                var segments = paths[i] ? paths[i].split('/') : [items[i].displayName || 'unknown'];
+                var node = root;
+                var builtPath = '';
+                for (var s = 0; s < segments.length; s++) {
+                    var seg = segments[s];
+                    builtPath += (s > 0 ? '/' : '') + seg;
+                    if (!node.children[seg]) {
+                        node.children[seg] = { name: seg, children: {}, projects: [], fullPath: builtPath };
+                    }
+                    node = node.children[seg];
+                }
+                node.projects.push(items[i]);
+                node.fullPath = paths[i];
+            }
+
+            return { root: root };
+        }
+
+        function getNodeAggregates(node, depth) {
+            if (!depth) depth = 0;
+            if (depth > 50) return { sessionCount: 0, totalSize: 0 };
+            var sessionCount = 0, totalSize = 0;
+            node.projects.forEach(function(it) {
+                var sessions = it.project.sessions || [];
+                sessionCount += sessions.length;
+                sessions.forEach(function(s) { totalSize += s.sizeBytes || 0; });
+            });
+            Object.keys(node.children).forEach(function(k) {
+                var child = getNodeAggregates(node.children[k], depth + 1);
+                sessionCount += child.sessionCount;
+                totalSize += child.totalSize;
+            });
+            return { sessionCount: sessionCount, totalSize: totalSize };
+        }
+
+        var folderTreeIdCounter = 0;
+        var _treeNodeSessions = {}; // treeId -> [sessionObj, ...]
+
+        function collectNodeSessions(node) {
+            var sessions = [];
+            for (var p = 0; p < node.projects.length; p++) {
+                sessions = sessions.concat(node.projects[p].project.sessions || []);
+            }
+            var childKeys = Object.keys(node.children);
+            for (var c = 0; c < childKeys.length; c++) {
+                sessions = sessions.concat(collectNodeSessions(node.children[childKeys[c]]));
+            }
+            return sessions;
+        }
+
+        function collapseSingleChildNodes(node) {
+            // Merge chains of single-child intermediate nodes into one label
+            // e.g. Users / alice / source / repos → Users/alice/source/repos
+            var childKeys = Object.keys(node.children);
+            while (childKeys.length === 1 && node.projects.length === 0) {
+                var onlyKey = childKeys[0];
+                var child = node.children[onlyKey];
+                node.name = node.name ? node.name + '/' + child.name : child.name;
+                node.children = child.children;
+                node.projects = child.projects;
+                node.fullPath = child.fullPath;
+                childKeys = Object.keys(node.children);
+            }
+            // Recurse into remaining children
+            for (var i = 0; i < childKeys.length; i++) {
+                collapseSingleChildNodes(node.children[childKeys[i]]);
+            }
+        }
+
+        function renderFolderTreeNode(node, depth) {
+            if (depth > 50) return '';
+            var childKeys = Object.keys(node.children).sort();
+            var hasChildren = childKeys.length > 0;
+            var hasProjects = node.projects.length > 0;
+
+            var html = '';
+
+            // Render any direct projects at this node
+            for (var dp = 0; dp < node.projects.length; dp++) {
+                var dit = node.projects[dp];
+                var didx = dit.idx;
+                html += '<div class="project-card" onclick="selectProject(' + didx + ')" data-idx="' + didx + '">' +
+                    '<div class="project-name">' + escapeHtml(dit.displayName) + ' <span class="project-meta-inline" id="project-badges-' + didx + '"></span></div>' +
+                    (dit.project.repository ? '<div style="margin-top:3px;"><span class="badge-repo" title="Repository">' + escapeHtml(dit.project.repository) + '</span></div>' : '') +
+                    '<div class="project-meta" id="project-meta-' + didx + '"></div>' +
+                    '<div id="project-tokens-' + didx + '"></div>' +
+                    '</div>';
+            }
+
+            // Render child folders
+            for (var ci = 0; ci < childKeys.length; ci++) {
+                var childNode = node.children[childKeys[ci]];
+                var treeId = 'ftree-' + (folderTreeIdCounter++);
+                var agg = getNodeAggregates(childNode);
+                _treeNodeSessions[treeId] = collectNodeSessions(childNode);
+
+                html += '<div class="folder-tree-node">' +
+                    '<div class="folder-tree-label" onclick="toggleFolderTreeNode(\'' + treeId + '\',this)">' +
+                    '<span class="folder-tree-toggle" id="ftoggle-' + treeId + '">&#9654;</span>' +
+                    '<span class="folder-tree-icon">&#128193;</span>' +
+                    '<span class="folder-tree-name" title="' + escapeHtml(childNode.fullPath || childKeys[ci]) + '">' + escapeHtml(childKeys[ci]) + '</span>' +
+                    '<span class="folder-tree-count">' + agg.sessionCount + ' sess &middot; ' + formatBytes(agg.totalSize) + '</span>' +
+                    '<span class="calc-tokens-btn" onclick="event.stopPropagation();calcTreeNodeTokens(\'' + treeId + '\',this)" title="Calculate total token usage">&#9202;</span>' +
+                    '</div>' +
+                    '<div id="tree-tokens-' + treeId + '" style="padding-left:42px;"></div>' +
+                    '<div class="folder-tree-children collapsed" id="' + treeId + '">' +
+                    renderFolderTreeNode(childNode, depth + 1) +
+                    '</div></div>';
+            }
+
+            return html;
+        }
+
+        function toggleFolderTreeNode(id, labelEl) {
+            var container = document.getElementById(id);
+            var toggle = document.getElementById('ftoggle-' + id);
+            if (!container) return;
+            var isCollapsed = container.classList.contains('collapsed');
+            container.classList.toggle('collapsed', !isCollapsed);
+            if (toggle) toggle.innerHTML = isCollapsed ? '&#9660;' : '&#9654;';
+        }
+
+        function expandPathToProject(projectIdx) {
+            // Expand all ancestor folder-tree nodes leading to a project card
+            var card = document.querySelector('.project-card[data-idx="' + projectIdx + '"]');
+            if (!card) return;
+            // Walk up the DOM from the card, expanding any collapsed folder-tree-children
+            var el = card.parentElement;
+            while (el) {
+                if (el.classList && el.classList.contains('folder-tree-children') && el.classList.contains('collapsed')) {
+                    el.classList.remove('collapsed');
+                    var toggle = document.getElementById('ftoggle-' + el.id);
+                    if (toggle) toggle.innerHTML = '&#9660;';
+                }
+                el = el.parentElement;
+            }
+            // Scroll the card into view
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        async function calcTreeNodeTokens(treeId, btn) {
+            var sessions = _treeNodeSessions[treeId];
+            if (!sessions || sessions.length === 0) return;
+            btn.textContent = '...';
+            btn.style.pointerEvents = 'none';
+            await fetchAllTokenUsage(sessions);
+            var el = document.getElementById('tree-tokens-' + treeId);
+            if (el) el.innerHTML = renderProjectTokenSummary(sessions);
+            btn.textContent = '\u2714';
+        }
+
+        async function calcRepoTokens(repoIdx, btn) {
+            if (!_lastRepoData) return;
+            var repo = _lastRepoData.repoKeys[repoIdx];
+            var items = repo != null ? _lastRepoData.byRepo[repo] : _lastRepoData.noRepo;
+            if (!items) return;
+            var allSessions = [];
+            items.forEach(function(it) { allSessions = allSessions.concat(it.project.sessions || []); });
+            if (allSessions.length === 0) return;
+            btn.textContent = '...';
+            btn.style.pointerEvents = 'none';
+            await fetchAllTokenUsage(allSessions);
+            var el = document.getElementById('repo-tokens-' + (repo != null ? repoIdx : 'norepo'));
+            if (el) el.innerHTML = renderProjectTokenSummary(allSessions);
+            // Also update individual project cards
+            items.forEach(function(it) {
+                var pEl = document.getElementById('project-tokens-' + it.idx);
+                if (pEl) pEl.innerHTML = renderProjectTokenSummary(it.project.sessions || []);
+            });
+            btn.textContent = '\u2714';
+        }
+
+        function fillProjectMeta(idx) {
+            var project = allProjects[idx];
+            if (!project) return;
+            var sessions = project.sessions || [];
+            var sessionCount = sessions.length;
+            var totalSize = sessions.reduce(function(sum, s) { return sum + (s.sizeBytes || 0); }, 0);
+            var claudeCount = sessions.filter(function(s) { return s.provider === 'claude'; }).length;
+            var copilotCount = sessions.filter(function(s) { return s.provider === 'copilot'; }).length;
+
+            // Badges
+            var badgesEl = document.getElementById('project-badges-' + idx);
+            if (badgesEl) {
+                var badges = '';
+                if (claudeCount > 0) badges += '<span class="badge-claude">CL ' + claudeCount + '</span> ';
+                if (copilotCount > 0) badges += '<span class="badge-copilot">CP ' + copilotCount + '</span>';
+                badgesEl.innerHTML = badges;
+            }
+
+            // Meta
+            var metaEl = document.getElementById('project-meta-' + idx);
+            if (metaEl) {
+                metaEl.textContent = sessionCount + ' session' + (sessionCount !== 1 ? 's' : '') + ' \u00b7 ' + formatBytes(totalSize);
+            }
+        }
+
+        // --- Repo View (flat list grouped by repository) ---
+
+        function buildRepoView(projects) {
+            var byRepo = {};
+            var noRepo = [];
+            for (var i = 0; i < projects.length; i++) {
+                var p = projects[i];
+                var repo = p.repository;
+                if (repo) {
+                    if (!byRepo[repo]) byRepo[repo] = [];
+                    byRepo[repo].push({ idx: i, project: p });
+                } else {
+                    noRepo.push({ idx: i, project: p });
+                }
+            }
+
+            // Sort repos by most recent session
+            var repoKeys = Object.keys(byRepo).sort(function(a, b) {
+                var aMax = 0, bMax = 0;
+                byRepo[a].forEach(function(it) {
+                    (it.project.sessions || []).forEach(function(s) {
+                        var t = new Date(s.lastModified).getTime();
+                        if (t > aMax) aMax = t;
+                    });
+                });
+                byRepo[b].forEach(function(it) {
+                    (it.project.sessions || []).forEach(function(s) {
+                        var t = new Date(s.lastModified).getTime();
+                        if (t > bMax) bMax = t;
+                    });
+                });
+                return bMax - aMax;
+            });
+
+            return { byRepo: byRepo, repoKeys: repoKeys, noRepo: noRepo };
+        }
+
+        function renderRepoView(repoData) {
+            var showTokens = document.getElementById('chkTokenUsage') && document.getElementById('chkTokenUsage').checked;
+            var html = '';
+
+            for (var ri = 0; ri < repoData.repoKeys.length; ri++) {
+                var repo = repoData.repoKeys[ri];
+                var items = repoData.byRepo[repo];
+                var treeId = 'repo-' + ri;
+
+                // Aggregate stats for the repo
+                var totalSessions = 0, totalSize = 0;
+                var allSessionIds = [];
+                items.forEach(function(it) {
+                    var sessions = it.project.sessions || [];
+                    totalSessions += sessions.length;
+                    sessions.forEach(function(s) {
+                        totalSize += s.sizeBytes || 0;
+                        allSessionIds.push(s.sessionId);
+                    });
+                });
+
+                html += '<div class="folder-tree-node">' +
+                    '<div class="folder-tree-label" onclick="toggleFolderTreeNode(\'' + treeId + '\',this)">' +
+                    '<span class="folder-tree-toggle" id="ftoggle-' + treeId + '">&#9660;</span>' +
+                    '<span class="folder-tree-icon">&#128230;</span>' +
+                    '<span class="folder-tree-name" title="' + escapeHtml(repo) + '">' + escapeHtml(repo) + '</span>' +
+                    '<span class="folder-tree-count">' + items.length + ' folder' + (items.length !== 1 ? 's' : '') +
+                    ' &middot; ' + totalSessions + ' sess &middot; ' + formatBytes(totalSize) + '</span>' +
+                    '<span class="calc-tokens-btn" onclick="event.stopPropagation();calcRepoTokens(' + ri + ',this)" title="Calculate total token usage">&#9202;</span>' +
+                    '</div>' +
+                    '<div class="project-tokens" id="repo-tokens-' + ri + '" style="padding-left:42px;"></div>' +
+                    '<div class="folder-tree-children" id="' + treeId + '">';
+
+                // Flat list of folders under this repo
+                for (var fi = 0; fi < items.length; fi++) {
+                    var it = items[fi];
+                    var idx = it.idx;
+                    var folderName = it.project.name || 'Unknown';
+                    var folderPath = it.project.cwd || it.project.path || '';
+                    html += '<div class="project-card" onclick="selectProject(' + idx + ')" data-idx="' + idx + '">' +
+                        '<div class="project-name">' + escapeHtml(folderName) + ' <span class="project-meta-inline" id="project-badges-' + idx + '"></span></div>' +
+                        '<div class="project-path" title="' + escapeHtml(folderPath) + '">' + escapeHtml(folderPath) + '</div>' +
+                        '<div class="project-meta" id="project-meta-' + idx + '"></div>' +
+                        '<div id="project-tokens-' + idx + '"></div>' +
+                        '</div>';
+                }
+
+                html += '</div></div>';
+            }
+
+            // Projects with no repository
+            if (repoData.noRepo.length > 0) {
+                var noRepoId = 'repo-norepo';
+                html += '<div class="folder-tree-node">' +
+                    '<div class="folder-tree-label" onclick="toggleFolderTreeNode(\'' + noRepoId + '\',this)">' +
+                    '<span class="folder-tree-toggle" id="ftoggle-' + noRepoId + '">&#9660;</span>' +
+                    '<span class="folder-tree-icon">&#128193;</span>' +
+                    '<span class="folder-tree-name">No Repository</span>' +
+                    '<span class="folder-tree-count">' + repoData.noRepo.length + ' folder' + (repoData.noRepo.length !== 1 ? 's' : '') + '</span>' +
+                    '<span class="calc-tokens-btn" onclick="event.stopPropagation();calcRepoTokens(null,this)" title="Calculate total token usage">&#9202;</span>' +
+                    '</div>' +
+                    '<div class="project-tokens" id="repo-tokens-norepo" style="padding-left:42px;"></div>' +
+                    '<div class="folder-tree-children" id="' + noRepoId + '">';
+
+                for (var ni = 0; ni < repoData.noRepo.length; ni++) {
+                    var nit = repoData.noRepo[ni];
+                    var nidx = nit.idx;
+                    var nPath = nit.project.cwd || nit.project.path || '';
+                    html += '<div class="project-card" onclick="selectProject(' + nidx + ')" data-idx="' + nidx + '">' +
+                        '<div class="project-name">' + escapeHtml(nit.project.name || 'Unknown') + ' <span id="project-badges-' + nidx + '"></span></div>' +
+                        '<div class="project-path" title="' + escapeHtml(nPath) + '">' + escapeHtml(nPath) + '</div>' +
+                        '<div class="project-meta" id="project-meta-' + nidx + '"></div>' +
+                        '<div id="project-tokens-' + nidx + '"></div>' +
+                        '</div>';
+                }
+
+                html += '</div></div>';
+            }
+
+            return html;
+        }
+
+        var _lastRepoData = null;
+
+        function updateRepoTokenSummaries() {
+            if (!_lastRepoData) return;
+            var showTokens = document.getElementById('chkTokenUsage') && document.getElementById('chkTokenUsage').checked;
+            if (!showTokens) return;
+
+            for (var ri = 0; ri < _lastRepoData.repoKeys.length; ri++) {
+                var el = document.getElementById('repo-tokens-' + ri);
+                if (!el) continue;
+                var items = _lastRepoData.byRepo[_lastRepoData.repoKeys[ri]];
+                var allSessions = [];
+                items.forEach(function(it) { allSessions = allSessions.concat(it.project.sessions || []); });
+                el.innerHTML = renderProjectTokenSummary(allSessions);
+            }
+        }
+
+        // --- Project Browser ---
+        async function loadProjects() {
+            var list = document.getElementById('projectList');
+            _lastRepoData = null;
+            try {
+                // Use prefetched data from sessionStorage if fresh, otherwise fetch
+                var cached = TranscriptPrefetch.getCached();
+                if (cached) {
+                    allProjects = cached;
+                    TranscriptPrefetch.clear(); // consume once, next load fetches fresh
+                } else {
+                    var resp = await fetch('/api/transcripts/projects');
+                    if (!resp.ok) throw new Error('Failed to load projects');
+                    allProjects = await resp.json();
+                }
+
+                if (allProjects.length === 0) {
+                    list.innerHTML = '<div class="empty-state"><p>No projects found</p></div>';
+                    return;
+                }
+
+                allProjects.sort(function(a, b) {
+                    var aMax = Math.max.apply(null, (a.sessions || []).map(function(s) { return new Date(s.lastModified).getTime(); }).concat([0]));
+                    var bMax = Math.max.apply(null, (b.sessions || []).map(function(s) { return new Date(s.lastModified).getTime(); }).concat([0]));
+                    return bMax - aMax;
+                });
+
+                var useRepo = document.getElementById('chkRepoView') && document.getElementById('chkRepoView').checked;
+                var titleEl = document.getElementById('sidebarTitle');
+                if (titleEl) titleEl.textContent = useRepo ? 'Repositories' : 'Folders';
+
+                if (useRepo) {
+                    // Repo view: flat list grouped by repository
+                    _lastRepoData = buildRepoView(allProjects);
+                    list.innerHTML = renderRepoView(_lastRepoData);
+                } else {
+                    // Folder tree view — full hierarchy from filesystem root
+                    folderTreeIdCounter = 0;
+                    var tree = buildFolderTree(allProjects);
+                    collapseSingleChildNodes(tree.root);
+                    list.innerHTML = '<div class="folder-tree">' + renderFolderTreeNode(tree.root, 0) + '</div>';
+                }
+
+                // Pass 2: fill in session counts, sizes, badges asynchronously
+                requestAnimationFrame(function() {
+                    for (var i = 0; i < allProjects.length; i++) {
+                        fillProjectMeta(i);
+                    }
+                    if (useRepo) updateRepoTokenSummaries();
+                });
+            } catch (err) {
+                list.innerHTML = '<div class="empty-state"><p>Error: ' + escapeHtml(err.message) + '</p></div>';
+            }
+        }
+
+        function selectProject(idx) {
+            document.querySelectorAll('.project-card').forEach(function(c) { c.classList.remove('active'); });
+            var card = document.querySelector('.project-card[data-idx="' + idx + '"]');
+            if (card) card.classList.add('active');
+
+            var project = allProjects[idx];
+            if (!project) return;
+
+            // Populate folder detail header
+            var header = document.getElementById('folderDetailHeader');
+            if (header) {
+                var sessions0 = project.sessions || [];
+                var totalSize0 = sessions0.reduce(function(sum, s) { return sum + (s.sizeBytes || 0); }, 0);
+                var folderPath = project.cwd || project.path || '';
+                header.style.display = '';
+                header.innerHTML = '<div class="folder-detail-name">' + escapeHtml(project.name || 'Unknown') + '</div>' +
+                    '<div class="folder-detail-path" title="' + escapeHtml(folderPath) + '">' + escapeHtml(folderPath) + '</div>' +
+                    '<div class="folder-detail-meta">' +
+                    '<span>' + sessions0.length + ' session' + (sessions0.length !== 1 ? 's' : '') + '</span>' +
+                    '<span>' + formatBytes(totalSize0) + '</span>' +
+                    (project.repository ? '<span class="badge-repo">' + escapeHtml(project.repository) + '</span>' : '') +
+                    '</div>';
+            }
+
+            var sessions = (project.sessions || []).sort(function(a, b) { return new Date(b.lastModified) - new Date(a.lastModified); });
+            var table = document.getElementById('sessionTable');
+            var showTokens = document.getElementById('chkTokenUsage') && document.getElementById('chkTokenUsage').checked;
+
+            if (sessions.length === 0) {
+                table.innerHTML = '<div class="empty-state"><p>No sessions in this folder</p></div>';
+                return;
+            }
+
+            // Build parent/child tree
+            var roots = [];
+            var childrenMap = {}; // parentSessionId -> [session, ...]
+            for (var i = 0; i < sessions.length; i++) {
+                var s = sessions[i];
+                if (s.parentSessionId) {
+                    if (!childrenMap[s.parentSessionId]) childrenMap[s.parentSessionId] = [];
+                    childrenMap[s.parentSessionId].push(s);
+                } else {
+                    roots.push(s);
+                }
+            }
+
+            var html = '<div class="session-tree">';
+
+            for (var r = 0; r < roots.length; r++) {
+                var root = roots[r];
+                var children = childrenMap[root.sessionId] || [];
+                var hasChildren = children.length > 0;
+                var providerClass = root.provider === 'copilot' ? 'copilot' : 'claude';
+                var providerLabel = root.provider === 'copilot' ? 'Copilot' : 'Claude';
+
+                html += '<div class="session-row" data-session-id="' + escapeHtml(root.sessionId) + '">';
+
+                // Line 1: toggle + provider + title
+                html += '<div class="session-row-line1">';
+                if (hasChildren) {
+                    html += '<span class="tree-toggle" data-toggle-session="' + escapeHtml(root.sessionId) + '" title="' + children.length + ' subagent(s)">&#9654;</span>';
+                } else {
+                    html += '<span class="tree-toggle-placeholder"></span>';
+                }
+                html += '<span class="session-provider ' + providerClass + '">' + providerLabel + '</span>';
+                if (root.title) {
+                    html += '<span class="session-title" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(root.title) + '</span>';
+                    html += '<span class="session-guid">(' + escapeHtml(root.sessionId.substring(0, 8)) + ')</span>';
+                } else {
+                    html += '<span class="session-id-cell" style="flex:1;min-width:0;">' + escapeHtml(root.sessionId) + '</span>';
+                }
+                html += '</div>';
+
+                // Line 2: branch, modified, size, tokens
+                html += '<div class="session-row-line2">';
+                if (root.branch) html += '<span class="session-meta-cell">' + escapeHtml(root.branch) + '</span>';
+                html += '<span class="session-meta-cell">' + new Date(root.lastModified).toLocaleString() + '</span>';
+                html += '<span class="session-meta-cell">' + formatBytes(root.sizeBytes) + '</span>';
+                if (showTokens) {
+                    html += '<span id="tokens-' + escapeHtml(root.sessionId) + '">' + renderTokenCell(tokenUsageCache[root.sessionId]) + '</span>';
+                }
+                html += '</div>';
+
+                html += '</div>';
+
+                // Child sessions (hidden by default)
+                if (hasChildren) {
+                    html += '<div class="session-children" id="children-' + escapeHtml(root.sessionId) + '" style="display:none;">';
+                    for (var c = 0; c < children.length; c++) {
+                        var child = children[c];
+                        var slugBadge = child.slug ? '<span class="agent-badge">' + escapeHtml(child.slug) + '</span>' : '';
+                        var treeLine = c < children.length - 1 ? '&#9500;&#9472; ' : '&#9492;&#9472; ';
+
+                        html += '<div class="session-row session-child" data-session-id="' + escapeHtml(child.sessionId) + '">';
+
+                        // Line 1: tree connector + title/label
+                        html += '<div class="session-row-line1">';
+                        html += '<span class="tree-toggle-placeholder"></span>';
+                        html += '<span style="color:var(--text-muted,#666);font-family:monospace;font-size:0.8em;">' + treeLine + '</span>';
+                        if (child.title) {
+                            html += '<span class="session-title" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(child.title) + '</span>';
+                            html += slugBadge;
+                            html += '<span class="session-guid">(' + escapeHtml(child.sessionId.substring(0, 8)) + ')</span>';
+                        } else {
+                            var fallbackLabel = child.agentId || child.sessionId;
+                            html += '<span class="session-id-cell" style="flex:1;min-width:0;">' + escapeHtml(fallbackLabel) + '</span>';
+                            html += slugBadge;
+                        }
+                        html += '</div>';
+
+                        // Line 2: metadata
+                        html += '<div class="session-row-line2" style="padding-left:52px;">';
+                        if (child.branch) html += '<span class="session-meta-cell">' + escapeHtml(child.branch) + '</span>';
+                        html += '<span class="session-meta-cell">' + new Date(child.lastModified).toLocaleString() + '</span>';
+                        html += '<span class="session-meta-cell">' + formatBytes(child.sizeBytes) + '</span>';
+                        if (showTokens) {
+                            html += '<span id="tokens-' + escapeHtml(child.sessionId) + '">' + renderTokenCell(tokenUsageCache[child.sessionId]) + '</span>';
+                        }
+                        html += '</div>';
+
+                        html += '</div>';
+                    }
+                    html += '</div>';
+                }
+            }
+
+            html += '</div>';
+            table.innerHTML = html;
+
+            // Fetch token usage async if enabled
+            if (showTokens) {
+                fetchAllTokenUsage(sessions);
+            }
+        }
+
+        function toggleSessionTree(sessionId, toggleEl) {
+            var container = document.getElementById('children-' + sessionId);
+            if (!container) return;
+            var isHidden = container.style.display === 'none';
+            container.style.display = isHidden ? '' : 'none';
+            toggleEl.innerHTML = isHidden ? '&#9660;' : '&#9654;';
+        }
+
+        function findSessionFilePath(sessionId) {
+            for (var i = 0; i < allProjects.length; i++) {
+                var sessions = allProjects[i].sessions || [];
+                for (var j = 0; j < sessions.length; j++) {
+                    if (sessions[j].sessionId === sessionId && sessions[j].filePath) {
+                        return sessions[j].filePath;
+                    }
+                }
+            }
+            return null;
+        }
+
+        // --- Transcript Viewer ---
+        async function viewTranscript(sessionId, skipPushState) {
+            // Close any existing SSE connection
+            closeSse();
+
+            currentSessionId = sessionId;
+            document.getElementById('browserView').style.display = 'none';
+            document.getElementById('transcriptView').style.display = '';
+
+            // Push history state so browser Back button returns to browser view
+            if (!skipPushState) {
+                history.pushState({ view: 'transcript', sessionId: sessionId }, '', '?session=' + encodeURIComponent(sessionId));
+            }
+
+            // Look up session title from cached project data
+            var sessionTitle = null;
+            for (var pi = 0; pi < allProjects.length && !sessionTitle; pi++) {
+                var pSessions = allProjects[pi].sessions || [];
+                for (var si = 0; si < pSessions.length; si++) {
+                    if (pSessions[si].sessionId === sessionId) {
+                        sessionTitle = pSessions[si].title;
+                        break;
+                    }
+                }
+            }
+            document.getElementById('transcriptTitle').textContent = sessionTitle || 'Transcript';
+            document.getElementById('transcriptSessionId').textContent = sessionId;
+            document.getElementById('transcriptContent').innerHTML = '<div class="empty-state"><p>Loading transcript...</p></div>';
+
+            // Show session file path if available
+            var filePathEl = document.getElementById('transcriptFilePath');
+            var sessionFilePath = findSessionFilePath(sessionId);
+            if (sessionFilePath) {
+                filePathEl.textContent = sessionFilePath;
+                filePathEl.title = sessionFilePath;
+                filePathEl.style.display = '';
+            } else {
+                filePathEl.style.display = 'none';
+            }
+
+            try {
+                var resp = await fetch('/api/claude-logs/transcript/' + encodeURIComponent(sessionId));
+                if (!resp.ok) throw new Error('Failed to load transcript');
+                currentEntries = await resp.json();
+
+                knownTypes = new Set();
+                currentEntries.forEach(function(e) { if (e.type) knownTypes.add(e.type); });
+
+                // Restore saved type filters if they intersect with known types
+                var savedFilters = loadFilter('cpa-transcript-type-filters', null);
+                if (savedFilters && Array.isArray(savedFilters)) {
+                    var restored = savedFilters.filter(function(t) { return knownTypes.has(t); });
+                    activeFilters = restored.length > 0 ? new Set(restored) : new Set(knownTypes);
+                } else {
+                    activeFilters = new Set(knownTypes);
+                }
+
+                toolUseIndex = buildToolUseIndex();
+                renderFilterChips();
+                renderTranscript();
+                autoScrollToBottom();
+
+                // Start live updates if enabled
+                if (document.getElementById('chkLive').checked) {
+                    startSse(sessionId);
+                }
+            } catch (err) {
+                document.getElementById('transcriptContent').innerHTML =
+                    '<div class="empty-state"><p>Error: ' + escapeHtml(err.message) + '</p></div>';
+            }
+        }
+
+        // --- SSE Live Streaming ---
+        function startSse(sessionId) {
+            closeSse();
+            sseSource = new EventSource('/api/claude-logs/transcript/' + encodeURIComponent(sessionId) + '/stream');
+            document.getElementById('liveIndicator').style.display = '';
+
+            sseSource.onmessage = function(event) {
+                var entry;
+                try {
+                    entry = JSON.parse(event.data);
+                } catch (parseErr) {
+                    return; // Ignore keepalive comments and malformed JSON
+                }
+                try {
+                    currentEntries.push(entry);
+
+                    // Index any tool_use blocks in this entry for result linking
+                    if (entry.message && Array.isArray(entry.message.content)) {
+                        entry.message.content.forEach(function(c) {
+                            if (c && c.type === 'tool_use' && c.id) toolUseIndex[c.id] = c;
+                        });
+                    }
+
+                    // Only auto-enable truly new types (never seen before)
+                    if (entry.type && !knownTypes.has(entry.type)) {
+                        knownTypes.add(entry.type);
+                        activeFilters.add(entry.type);
+                        renderFilterChips();
+                    }
+
+                    // If entry matches current filters, append it to DOM
+                    if (entry.type && activeFilters.has(entry.type)) {
+                        appendTranscriptEntry(entry, currentEntries.length - 1);
+                        updateEntryCount();
+                        autoScrollToBottom();
+                    }
+                } catch (renderErr) {
+                    console.error('Failed to process transcript entry:', renderErr);
+                }
+            };
+
+            sseSource.onerror = function() {
+                document.getElementById('liveIndicator').style.display = 'none';
+            };
+        }
+
+        function closeSse() {
+            if (sseSource) {
+                sseSource.close();
+                sseSource = null;
+            }
+            var indicator = document.getElementById('liveIndicator');
+            if (indicator) indicator.style.display = 'none';
+        }
+
+        // --- Filter Chips ---
+        function renderFilterChips() {
+            var container = document.getElementById('transcriptFilters');
+            var sorted = Array.from(knownTypes).sort();
+            container.innerHTML = sorted.map(function(t) {
+                var isActive = activeFilters.has(t);
+                return '<span class="filter-chip ' + (isActive ? 'active' : '') + '" data-type="' + escapeHtml(t) + '">' + escapeHtml(t) + '</span>';
+            }).join('') + '<span class="filter-chip toggle-all-filters" style="font-weight:600;">Toggle All</span>';
+        }
+
+        function toggleFilter(type) {
+            if (activeFilters.has(type)) activeFilters.delete(type);
+            else activeFilters.add(type);
+            document.querySelectorAll('.filter-chip[data-type]').forEach(function(c) {
+                c.classList.toggle('active', activeFilters.has(c.dataset.type));
+            });
+            renderTranscript();
+            saveFilter('cpa-transcript-type-filters', Array.from(activeFilters));
+        }
+
+        function toggleAllFilters() {
+            if (activeFilters.size === knownTypes.size) {
+                activeFilters.clear();
+            } else {
+                activeFilters = new Set(knownTypes);
+            }
+            document.querySelectorAll('.filter-chip[data-type]').forEach(function(c) {
+                c.classList.toggle('active', activeFilters.has(c.dataset.type));
+            });
+            renderTranscript();
+            saveFilter('cpa-transcript-type-filters', Array.from(activeFilters));
+        }
+
+        // Event delegation for dynamically rendered elements (prevents XSS
+        // from inline onclick handlers with user-controlled data).
+        document.addEventListener('click', function(e) {
+            var toggle = e.target.closest('[data-toggle-session]');
+            if (toggle) {
+                e.stopPropagation();
+                toggleSessionTree(toggle.dataset.toggleSession, toggle);
+                return;
+            }
+            var row = e.target.closest('[data-session-id]');
+            if (row) {
+                viewTranscript(row.dataset.sessionId);
+                return;
+            }
+            var chip = e.target.closest('.filter-chip[data-type]');
+            if (chip) {
+                toggleFilter(chip.dataset.type);
+                return;
+            }
+            if (e.target.closest('.toggle-all-filters')) {
+                toggleAllFilters();
+            }
+        });
+
+        // --- Rendering ---
+        function renderTranscript() {
+            collapseIdCounter = 0;
+            var container = document.getElementById('transcriptContent');
+            var filtered = currentEntries.filter(function(e) { return e.type && activeFilters.has(e.type); });
+            updateEntryCount();
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="empty-state"><p>No entries match the selected filters</p></div>';
+                return;
+            }
+
+            container.innerHTML = filtered.map(function(entry, i) {
+                return buildEntryHtml(entry, i);
+            }).join('');
+        }
+
+        function appendTranscriptEntry(entry, globalIdx) {
+            var container = document.getElementById('transcriptContent');
+            // Remove empty-state if present
+            var empty = container.querySelector('.empty-state');
+            if (empty) empty.remove();
+
+            var filtered = currentEntries.filter(function(e) { return e.type && activeFilters.has(e.type); });
+            var localIdx = filtered.length - 1;
+
+            var div = document.createElement('div');
+            div.innerHTML = buildEntryHtml(entry, localIdx);
+            var child = div.firstElementChild;
+            if (child) {
+                child.classList.add('new-entry');
+                container.appendChild(child);
+            }
+        }
+
+        function hasToolBlocks(entry) {
+            if (!entry.message || typeof entry.message !== 'object') return false;
+            var content = entry.message.content;
+            if (!Array.isArray(content)) return false;
+            for (var i = 0; i < content.length; i++) {
+                if (content[i] && (content[i].type === 'tool_use' || content[i].type === 'tool_result')) return true;
+            }
+            return false;
+        }
+
+        function hasSpecialBlocks(entry) {
+            if (!entry.message || typeof entry.message !== 'object') return false;
+            var content = entry.message.content;
+            if (!Array.isArray(content)) return false;
+            for (var i = 0; i < content.length; i++) {
+                if (content[i] && (content[i].type === 'tool_use' || content[i].type === 'tool_result' || content[i].type === 'thinking')) return true;
+            }
+            return false;
+        }
+
+        // Build index of tool_use_id -> tool_use content block for linking results to requests
+        function buildToolUseIndex() {
+            var index = {};
+            for (var i = 0; i < currentEntries.length; i++) {
+                var e = currentEntries[i];
+                if (!e.message || !Array.isArray(e.message.content)) continue;
+                for (var j = 0; j < e.message.content.length; j++) {
+                    var c = e.message.content[j];
+                    if (c && c.type === 'tool_use' && c.id) {
+                        index[c.id] = c;
+                    }
+                }
+            }
+            return index;
+        }
+
+        var toolUseIndex = {};
+
+        function findToolUseForResult(toolResult) {
+            if (!toolResult.tool_use_id) return null;
+            return toolUseIndex[toolResult.tool_use_id] || null;
+        }
+
+        // --- claude-trace inspired: tool display name ---
+        function getToolDisplayName(c) {
+            var name = c.name || 'unknown';
+            var input = c.input || {};
+            var n = name.toLowerCase();
+            if (n === 'bash' || n === 'execute') {
+                var cmd = input.command || '';
+                if (cmd.length > 80) cmd = cmd.substring(0, 80) + '...';
+                return name + '(' + cmd + ')';
+            }
+            if (n === 'read') return name + '(' + (input.file_path || '') + ')';
+            if (n === 'write') return name + '(' + (input.file_path || '') + ')';
+            if (n === 'edit') {
+                var fp = input.file_path || '';
+                var fileName = fp.split('/').pop() || fp.split('\\').pop() || fp;
+                return name + '(' + fileName + ')';
+            }
+            if (n === 'multiedit') {
+                var fp2 = input.file_path || '';
+                var fn2 = fp2.split('/').pop() || fp2.split('\\').pop() || fp2;
+                return name + '(' + fn2 + ', ' + (input.edits || []).length + ' edits)';
+            }
+            if (n === 'grep') return name + '(' + (input.pattern || '') + ')';
+            if (n === 'glob') return name + '(' + (input.pattern || '') + ')';
+            if (n === 'websearch') return name + '(' + (input.query || '') + ')';
+            if (n === 'webfetch') return name + '(' + (input.url || '').substring(0, 60) + ')';
+            if (n === 'task') return name + '(' + (input.description || '').substring(0, 60) + ')';
+            return name;
+        }
+
+        // --- LCS-based side-by-side diff (computation + rendering) ---
+
+        // Compute line-level diff using Longest Common Subsequence (LCS).
+        // O(m*n) time and space. Returns array of {type, oldLine?, newLine?, oldNum?, newNum?}
+        // where type is 'equal', 'insert', or 'delete' and line numbers are 1-indexed.
+        function computeLineDiff(oldLines, newLines) {
+            var m = oldLines.length, n = newLines.length;
+            var dp = [];
+            for (var i = 0; i <= m; i++) {
+                dp[i] = [];
+                for (var j = 0; j <= n; j++) {
+                    if (i === 0 || j === 0) dp[i][j] = 0;
+                    else if (oldLines[i - 1] === newLines[j - 1]) dp[i][j] = dp[i - 1][j - 1] + 1;
+                    else dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+                }
+            }
+            var ops = [];
+            var oi = m, ni = n;
+            while (oi > 0 || ni > 0) {
+                if (oi > 0 && ni > 0 && oldLines[oi - 1] === newLines[ni - 1]) {
+                    ops.push({ type: 'equal', oldLine: oldLines[oi - 1], newLine: newLines[ni - 1], oldNum: oi, newNum: ni });
+                    oi--; ni--;
+                } else if (ni > 0 && (oi === 0 || dp[oi][ni - 1] >= dp[oi - 1][ni])) {
+                    ops.push({ type: 'insert', newLine: newLines[ni - 1], newNum: ni });
+                    ni--;
+                } else {
+                    ops.push({ type: 'delete', oldLine: oldLines[oi - 1], oldNum: oi });
+                    oi--;
+                }
+            }
+            ops.reverse();
+            return ops;
+        }
+
+        // Simple fallback for large diffs where LCS would be too expensive
+        function renderSimpleDiff(oldLines, newLines) {
+            var html = '<div class="diff-header">' +
+                '<span class="diff-header-side diff-header-old">Old</span>' +
+                '<span class="diff-header-side diff-header-new">New</span></div>';
+            html += '<table class="diff-table"><colgroup>' +
+                '<col class="diff-line-num"><col><col class="diff-gutter"><col class="diff-line-num"><col>' +
+                '</colgroup><tbody>';
+            for (var i = 0; i < oldLines.length; i++) {
+                html += '<tr class="diff-line-deleted">' +
+                    '<td class="diff-line-num">' + (i + 1) + '</td><td class="diff-code">' + escapeHtml(oldLines[i]) + '</td>' +
+                    '<td class="diff-gutter"></td>' +
+                    '<td class="diff-line-num diff-line-empty"></td><td class="diff-code diff-line-empty"></td></tr>';
+            }
+            for (var j = 0; j < newLines.length; j++) {
+                html += '<tr class="diff-line-inserted">' +
+                    '<td class="diff-line-num diff-line-empty"></td><td class="diff-code diff-line-empty"></td>' +
+                    '<td class="diff-gutter"></td>' +
+                    '<td class="diff-line-num">' + (j + 1) + '</td><td class="diff-code">' + escapeHtml(newLines[j]) + '</td></tr>';
+            }
+            html += '</tbody></table>';
+            return html;
+        }
+
+        function renderSideBySideDiff(oldStr, newStr) {
+            var oldLines = (oldStr || '').split('\n');
+            var newLines = (newStr || '').split('\n');
+
+            // Guard: fall back to simple diff for very large inputs to avoid O(n*m) freeze
+            var MAX_CELLS = 500000;
+            if (oldLines.length * newLines.length > MAX_CELLS) {
+                return renderSimpleDiff(oldLines, newLines);
+            }
+
+            var ops = computeLineDiff(oldLines, newLines);
+
+            var html = '<div class="diff-header">' +
+                '<span class="diff-header-side diff-header-old">Old</span>' +
+                '<span class="diff-header-side diff-header-new">New</span></div>';
+            html += '<table class="diff-table"><colgroup>' +
+                '<col class="diff-line-num"><col><col class="diff-gutter"><col class="diff-line-num"><col>' +
+                '</colgroup><tbody>';
+
+            for (var i = 0; i < ops.length; i++) {
+                var op = ops[i];
+                if (op.type === 'equal') {
+                    html += '<tr class="diff-line-equal">' +
+                        '<td class="diff-line-num">' + op.oldNum + '</td><td class="diff-code">' + escapeHtml(op.oldLine) + '</td>' +
+                        '<td class="diff-gutter"></td>' +
+                        '<td class="diff-line-num">' + op.newNum + '</td><td class="diff-code">' + escapeHtml(op.newLine) + '</td></tr>';
+                } else if (op.type === 'delete') {
+                    html += '<tr class="diff-line-deleted">' +
+                        '<td class="diff-line-num">' + op.oldNum + '</td><td class="diff-code">' + escapeHtml(op.oldLine) + '</td>' +
+                        '<td class="diff-gutter"></td>' +
+                        '<td class="diff-line-num diff-line-empty"></td><td class="diff-code diff-line-empty"></td></tr>';
+                } else if (op.type === 'insert') {
+                    html += '<tr class="diff-line-inserted">' +
+                        '<td class="diff-line-num diff-line-empty"></td><td class="diff-code diff-line-empty"></td>' +
+                        '<td class="diff-gutter"></td>' +
+                        '<td class="diff-line-num">' + op.newNum + '</td><td class="diff-code">' + escapeHtml(op.newLine) + '</td></tr>';
+                }
+            }
+
+            html += '</tbody></table>';
+            return html;
+        }
+
+        // --- claude-trace inspired: enhanced tool_use rendering ---
+        function renderToolUseEnhanced(c) {
+            var name = (c.name || '').toLowerCase();
+            var input = c.input || {};
+            var badge = '<span class="tool-name-badge">' + escapeHtml(c.name || 'unknown') + '</span>';
+            var specialContent = '';
+
+            if (name === 'bash' || name === 'execute') {
+                specialContent = '<div class="bash-command">' + escapeHtml(input.command || '') + '</div>';
+                if (input.description) {
+                    specialContent += '<div style="font-size:0.82em;color:var(--text-muted);margin-top:4px;">' + escapeHtml(input.description) + '</div>';
+                }
+            } else if (name === 'edit') {
+                specialContent = '<div class="file-path-display">' + escapeHtml(input.file_path || '') + '</div>';
+                if (input.old_string != null && input.new_string != null) {
+                    try {
+                        specialContent += renderSideBySideDiff(input.old_string, input.new_string);
+                    } catch (diffErr) {
+                        specialContent += '<div style="color:var(--color-danger,#dc2626);font-size:0.85em;padding:8px;background:rgba(239,68,68,0.08);border-radius:4px;">Failed to render diff: ' + escapeHtml(String(diffErr.message || diffErr)) + '</div>';
+                    }
+                }
+            } else if (name === 'multiedit') {
+                specialContent = '<div class="file-path-display">' + escapeHtml(input.file_path || '') + '</div>';
+                var edits = input.edits || [];
+                for (var i = 0; i < edits.length; i++) {
+                    var edit = edits[i];
+                    if (!edit || typeof edit !== 'object') continue;
+                    specialContent += '<div style="margin-top:8px;font-size:0.8em;color:var(--text-muted);font-weight:600;">Edit ' + (i + 1) + ':</div>';
+                    try {
+                        specialContent += renderSideBySideDiff(edit.old_string, edit.new_string);
+                    } catch (diffErr) {
+                        specialContent += '<div style="color:var(--color-danger,#dc2626);font-size:0.85em;padding:8px;background:rgba(239,68,68,0.08);border-radius:4px;">Failed to render diff: ' + escapeHtml(String(diffErr.message || diffErr)) + '</div>';
+                    }
+                }
+            } else if (name === 'write') {
+                specialContent = '<div class="file-path-display">' + escapeHtml(input.file_path || '') + '</div>';
+                if (input.content) {
+                    var lines = input.content.split('\n');
+                    var previewLines = lines.slice(0, 10);
+                    specialContent += '<div class="write-preview">' + escapeHtml(previewLines.join('\n'));
+                    if (lines.length > 10) {
+                        specialContent += '<div class="truncation-notice">... ' + (lines.length - 10) + ' more lines</div>';
+                    }
+                    specialContent += '</div>';
+                }
+            } else if (name === 'read') {
+                specialContent = '<div class="file-path-display">' + escapeHtml(input.file_path || '') + '</div>';
+            } else if (name === 'grep') {
+                specialContent = '<div style="font-family:var(--font-mono);font-size:0.85em;">';
+                if (input.pattern) specialContent += '<span style="color:var(--text-primary);">pattern:</span> ' + escapeHtml(input.pattern) + '<br>';
+                if (input.path) specialContent += '<span style="color:var(--text-primary);">path:</span> ' + escapeHtml(input.path) + '<br>';
+                if (input.glob) specialContent += '<span style="color:var(--text-primary);">glob:</span> ' + escapeHtml(input.glob);
+                specialContent += '</div>';
+            } else if (name === 'glob') {
+                specialContent = '<div style="font-family:var(--font-mono);font-size:0.85em;">' + escapeHtml(input.pattern || '');
+                if (input.path) specialContent += ' in ' + escapeHtml(input.path);
+                specialContent += '</div>';
+            } else {
+                // Generic: show all fields in monospace block
+                var details = formatToolUse(c);
+                var detailLines = details.split('\n');
+                if (detailLines.length > 0 && detailLines[0].indexOf('Tool: ') === 0) detailLines.shift();
+                specialContent = '<div class="tool-use-block">' + escapeHtml(detailLines.join('\n')) + '</div>';
+            }
+
+            return '<div class="tool-block">' + badge +
+                '<span class="tool-display-name"><span class="tool-param">' + escapeHtml(getToolDisplayName(c)) + '</span></span>' +
+                specialContent + '</div>';
+        }
+
+        // --- claude-trace inspired: collapsible tool result ---
+        function renderToolResultEnhanced(c, originatingToolUse) {
+            var cid = nextCollapseId();
+            var isError = c.is_error;
+            var statusIcon = isError ? 'ERR' : 'OK';
+            var statusStyle = isError ? 'color:var(--color-danger)' : 'color:var(--color-success)';
+
+            var toolHeader = '';
+            if (originatingToolUse) {
+                toolHeader = '<span class="tool-name-badge">' + escapeHtml(originatingToolUse.name || 'unknown') + '</span>' +
+                    '<span class="tool-display-name"><span class="tool-param">' + escapeHtml(getToolDisplayName(originatingToolUse)) + '</span></span>';
+            }
+
+            var resultText = formatToolResult(c);
+            var truncResult = resultText.length > 2000;
+            var displayResult = truncResult ? resultText.substring(0, 2000) + '\n... [truncated, ' + resultText.length + ' chars total]' : resultText;
+
+            return '<div class="tool-block">' + toolHeader +
+                '<div class="collapse-toggle" onclick="toggleCollapse(\'' + cid + '\')" style="margin-top:4px;">' +
+                    '<span class="toggle-indicator" id="toggle-' + cid + '">[+]</span>' +
+                    '<span style="font-size:0.82em;color:var(--text-muted);">Result <span style="' + statusStyle + ';font-weight:600;">' + statusIcon + '</span></span>' +
+                '</div>' +
+                '<div id="collapse-' + cid + '" class="collapse-content collapsed">' +
+                    '<div class="tool-result-block" style="max-height:none;">' + escapeHtml(displayResult) + '</div>' +
+                '</div>' +
+                '</div>';
+        }
+
+        function buildToolBlocksHtml(entry, idx) {
+            var content = entry.message.content;
+            var parts = [];
+            var useMarkdown = document.getElementById('chkMarkdown') && document.getElementById('chkMarkdown').checked;
+            for (var i = 0; i < content.length; i++) {
+                var c = content[i];
+                if (typeof c === 'string') {
+                    if (c.trim()) parts.push('<div class="entry-content">' + escapeHtml(c) + '</div>');
+                } else if (c && c.type === 'thinking') {
+                    var thinkingText = c.thinking || c.text || '';
+                    var rendered = useMarkdown && typeof SimpleMarkdown !== 'undefined'
+                        ? SimpleMarkdown.render(thinkingText)
+                        : escapeHtml(thinkingText);
+                    parts.push('<div class="thinking-block"><div class="thinking-label">Thinking</div>' +
+                        '<div' + (useMarkdown ? ' class="md-rendered"' : '') + '>' + rendered + '</div></div>');
+                } else if (c && c.type === 'tool_use') {
+                    parts.push(renderToolUseEnhanced(c));
+                } else if (c && c.type === 'tool_result') {
+                    var originatingToolUse = findToolUseForResult(c);
+                    parts.push(renderToolResultEnhanced(c, originatingToolUse));
+                } else if (c && c.text) {
+                    if (useMarkdown && typeof SimpleMarkdown !== 'undefined') {
+                        parts.push('<div class="entry-content md-rendered">' + SimpleMarkdown.render(c.text) + '</div>');
+                    } else {
+                        parts.push('<div class="entry-content">' + escapeHtml(c.text) + '</div>');
+                    }
+                } else if (c && c.type === 'image') {
+                    parts.push('<div class="entry-content">[Image]</div>');
+                }
+            }
+            return parts.join('\n');
+        }
+
+        // --- claude-trace inspired: role-based coloring ---
+        function getRoleClass(type, role) {
+            if (type === 'user' || role === 'user' || type === 'user.message') return 'role-user';
+            if (type === 'assistant' || role === 'assistant' || type === 'assistant.message') return 'role-assistant';
+            if (type === 'tool_result' || type === 'tool.execution_complete') return 'role-tool';
+            if (type === 'system' || type === 'file-history-snapshot' || type === 'session.info' || type === 'session.warning') return 'role-system';
+            if (type === 'progress' || type === 'hook_progress' || type === 'tool.execution_start' || type === 'assistant.turn_start' || type === 'assistant.turn_end') return 'role-tool';
+            if (type === 'session.start' || type === 'session.resume' || type === 'session.end' || type === 'session.task_complete') return 'role-system';
+            if (type === 'session.mode_changed' || type === 'session.plan_changed') return 'role-system';
+            if (type === 'session.compaction_start' || type === 'session.compaction_complete') return 'role-system';
+            if (type === 'subagent.started' || type === 'subagent.completed') return 'role-tool';
+            if (type === 'abort') return 'role-system';
+            return '';
+        }
+
+        function getRoleBadgeClass(type, role) {
+            if (type === 'user' || role === 'user' || type === 'user.message') return 'badge-user';
+            if (type === 'assistant' || role === 'assistant' || type === 'assistant.message') return 'badge-assistant';
+            if (type === 'tool_result' || type === 'tool.execution_complete') return 'badge-tool';
+            if (type === 'system' || type === 'file-history-snapshot' || type === 'session.info' || type === 'session.warning') return 'badge-system';
+            if (type === 'progress' || type === 'hook_progress' || type === 'tool.execution_start' || type === 'assistant.turn_start' || type === 'assistant.turn_end') return 'badge-tool';
+            if (type === 'session.start' || type === 'session.resume' || type === 'session.end' || type === 'session.task_complete') return 'badge-system';
+            if (type === 'session.mode_changed' || type === 'session.plan_changed') return 'badge-system';
+            if (type === 'session.compaction_start' || type === 'session.compaction_complete') return 'badge-system';
+            if (type === 'subagent.started' || type === 'subagent.completed') return 'badge-tool';
+            if (type === 'abort') return 'badge-system';
+            return '';
+        }
+
+        function buildEntryHtml(entry, idx) {
+            var type = entry.type || 'unknown';
+            var time = entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString() : '';
+            var role = entry.message && typeof entry.message === 'object' ? (entry.message.role || '') : '';
+            var useMarkdown = document.getElementById('chkMarkdown') && document.getElementById('chkMarkdown').checked;
+
+            // Detect tool_result messages masquerading as "user" type
+            if (type === 'user' && entry.message && Array.isArray(entry.message.content)) {
+                var hasToolResult = entry.message.content.some(function(c) { return c && c.type === 'tool_result'; });
+                if (hasToolResult) {
+                    type = 'tool_result';
+                    role = 'tool output';
+                }
+            }
+
+            var roleClass = getRoleClass(type, role);
+            var badgeClass = getRoleBadgeClass(type, role);
+
+            var contentHtml = '';
+
+            // Copilot tool events: render with enhanced tool blocks
+            if (entry.provider === 'copilot' && entry.data && typeof entry.data === 'object') {
+                if (type === 'tool.execution_start') {
+                    var td = entry.data;
+                    var toolName = td.toolName || 'unknown';
+                    var badge = '<span class="tool-name-badge">' + escapeHtml(toolName) + '</span>';
+                    var specialContent = '';
+                    var tn = toolName.toLowerCase();
+                    var args = typeof td.arguments === 'object' && td.arguments !== null ? td.arguments : {};
+
+                    if (tn === 'powershell' || tn === 'bash' || tn === 'execute') {
+                        if (args.command) specialContent = '<div class="bash-command">' + escapeHtml(args.command) + '</div>';
+                        if (args.description) specialContent += '<div style="font-size:0.82em;color:var(--text-muted);margin-top:4px;">' + escapeHtml(args.description) + '</div>';
+                    } else if (tn === 'edit') {
+                        if (args.path || args.file_path) specialContent = '<div class="file-path-display">' + escapeHtml(args.path || args.file_path) + '</div>';
+                        if (args.old_str != null && args.new_str != null) {
+                            try { specialContent += renderSideBySideDiff(args.old_str, args.new_str); } catch(e) {}
+                        }
+                    } else if (tn === 'create') {
+                        if (args.path) specialContent = '<div class="file-path-display">' + escapeHtml(args.path) + '</div>';
+                        if (args.file_text) {
+                            var lines = args.file_text.split('\n');
+                            var preview = lines.slice(0, 10);
+                            specialContent += '<div class="write-preview">' + escapeHtml(preview.join('\n'));
+                            if (lines.length > 10) specialContent += '<div class="truncation-notice">... ' + (lines.length - 10) + ' more lines</div>';
+                            specialContent += '</div>';
+                        }
+                    } else if (tn === 'view' || tn === 'read') {
+                        specialContent = '<div class="file-path-display">' + escapeHtml(args.path || args.file_path || '') + '</div>';
+                    } else if (tn === 'grep') {
+                        specialContent = '<div style="font-family:var(--font-mono);font-size:0.85em;">';
+                        if (args.pattern) specialContent += '<span style="color:var(--text-primary);">pattern:</span> ' + escapeHtml(args.pattern) + '<br>';
+                        if (args.path) specialContent += '<span style="color:var(--text-primary);">path:</span> ' + escapeHtml(args.path);
+                        specialContent += '</div>';
+                    } else if (tn === 'glob') {
+                        specialContent = '<div style="font-family:var(--font-mono);font-size:0.85em;">' + escapeHtml(args.pattern || '');
+                        if (args.path) specialContent += ' in ' + escapeHtml(args.path);
+                        specialContent += '</div>';
+                    } else {
+                        var argsStr = JSON.stringify(args, null, 2);
+                        if (argsStr.length > 500) argsStr = argsStr.substring(0, 500) + '...';
+                        specialContent = '<div class="tool-use-block">' + escapeHtml(argsStr) + '</div>';
+                    }
+
+                    contentHtml = '<div class="entry-content" id="content-' + idx + '"><div class="tool-block">' + badge + specialContent + '</div></div>';
+                } else if (type === 'tool.execution_complete') {
+                    var td2 = entry.data;
+                    var cid = nextCollapseId();
+                    var isError = td2.success === false;
+                    var statusIcon = isError ? 'ERR' : 'OK';
+                    var statusStyle = isError ? 'color:var(--color-danger)' : 'color:var(--color-success)';
+                    var toolBadge2 = '<span class="tool-name-badge">' + escapeHtml(td2.toolName || 'unknown') + '</span>';
+
+                    var resultText = '';
+                    if (td2.result) {
+                        if (td2.result.content) resultText += td2.result.content;
+                        if (td2.result.detailedContent) resultText += (resultText ? '\n' : '') + td2.result.detailedContent;
+                    }
+                    if (!resultText) resultText = '(empty result)';
+                    if (resultText.length > 3000) resultText = resultText.substring(0, 3000) + '\n... [truncated]';
+
+                    contentHtml = '<div class="entry-content" id="content-' + idx + '"><div class="tool-block">' + toolBadge2 +
+                        '<div class="collapse-toggle" onclick="toggleCollapse(\'' + cid + '\')" style="margin-top:4px;">' +
+                            '<span class="toggle-indicator" id="toggle-' + cid + '">[+]</span>' +
+                            '<span style="font-size:0.82em;color:var(--text-muted);">Result <span style="' + statusStyle + ';font-weight:600;">' + statusIcon + '</span></span>' +
+                        '</div>' +
+                        '<div id="collapse-' + cid + '" class="collapse-content collapsed">' +
+                            '<div class="tool-result-block" style="max-height:none;">' + escapeHtml(resultText) + '</div>' +
+                        '</div></div></div>';
+                }
+            }
+
+            // If entry contains tool_use, tool_result, or thinking blocks, use enhanced rendering
+            if (!contentHtml && hasSpecialBlocks(entry)) {
+                contentHtml = '<div class="entry-content" id="content-' + idx + '">' + buildToolBlocksHtml(entry, idx) + '</div>';
+            }
+            if (!contentHtml) {
+                var content = extractContent(entry);
+                var truncated = content && content.length > 500;
+                var displayContent = truncated ? content.substring(0, 500) : content;
+
+                if (displayContent) {
+                    if (useMarkdown && typeof SimpleMarkdown !== 'undefined') {
+                        contentHtml = '<div class="entry-content md-rendered" id="content-' + idx + '">' + SimpleMarkdown.render(displayContent) + '</div>';
+                    } else {
+                        contentHtml = '<div class="entry-content ' + (truncated ? 'truncated' : '') + '" id="content-' + idx + '">' + escapeHtml(displayContent) + '</div>';
+                    }
+                    if (truncated) {
+                        contentHtml += '<button class="expand-btn" onclick="expandContent(' + idx + ', this)">Show more (' + content.length + ' chars)</button>';
+                    }
+                }
+            }
+
+            return '<div class="transcript-entry ' + roleClass + '">' +
+                '<div class="entry-header">' +
+                '<span><span class="entry-type role-badge ' + badgeClass + '">' + escapeHtml(type) + '</span>' + (role ? ' <strong>' + escapeHtml(role) + '</strong>' : '') + '</span>' +
+                '<span>' + time + '</span>' +
+                '</div>' +
+                contentHtml +
+                '</div>';
+        }
+
+        function updateEntryCount() {
+            var filtered = currentEntries.filter(function(e) { return e.type && activeFilters.has(e.type); });
+            document.getElementById('entryCount').textContent = 'Showing ' + filtered.length + ' of ' + currentEntries.length + ' entries';
+        }
+
+        function formatToolUse(c) {
+            var lines = ['Tool: ' + (c.name || 'unknown')];
+            var input = c.input || {};
+            var name = (c.name || '').toLowerCase();
+
+            // Show the most relevant fields prominently based on tool type
+            if (name === 'bash' || name === 'execute') {
+                if (input.command) lines.push('command: ' + input.command);
+                if (input.description) lines.push('description: ' + input.description);
+                if (input.timeout) lines.push('timeout: ' + input.timeout + 'ms');
+            } else if (name === 'read') {
+                if (input.file_path) lines.push('file_path: ' + input.file_path);
+                if (input.offset) lines.push('offset: ' + input.offset);
+                if (input.limit) lines.push('limit: ' + input.limit);
+            } else if (name === 'edit') {
+                if (input.file_path) lines.push('file_path: ' + input.file_path);
+                if (input.old_string) {
+                    var old = input.old_string.length > 200 ? input.old_string.substring(0, 200) + '...' : input.old_string;
+                    lines.push('old_string: ' + old);
+                }
+                if (input.new_string) {
+                    var ns = input.new_string.length > 200 ? input.new_string.substring(0, 200) + '...' : input.new_string;
+                    lines.push('new_string: ' + ns);
+                }
+                if (input.replace_all) lines.push('replace_all: true');
+            } else if (name === 'write') {
+                if (input.file_path) lines.push('file_path: ' + input.file_path);
+                if (input.content) {
+                    var preview = input.content.length > 200 ? input.content.substring(0, 200) + '...' : input.content;
+                    lines.push('content: ' + preview);
+                }
+            } else if (name === 'grep') {
+                if (input.pattern) lines.push('pattern: ' + input.pattern);
+                if (input.path) lines.push('path: ' + input.path);
+                if (input.glob) lines.push('glob: ' + input.glob);
+                if (input.output_mode) lines.push('output_mode: ' + input.output_mode);
+            } else if (name === 'glob') {
+                if (input.pattern) lines.push('pattern: ' + input.pattern);
+                if (input.path) lines.push('path: ' + input.path);
+            } else if (name === 'websearch') {
+                if (input.query) lines.push('query: ' + input.query);
+            } else if (name === 'webfetch') {
+                if (input.url) lines.push('url: ' + input.url);
+                if (input.prompt) lines.push('prompt: ' + input.prompt);
+            } else {
+                // Generic: show all input keys
+                var keys = Object.keys(input);
+                for (var k = 0; k < keys.length; k++) {
+                    var val = input[keys[k]];
+                    var valStr = typeof val === 'string' ? val : JSON.stringify(val);
+                    if (valStr && valStr.length > 300) valStr = valStr.substring(0, 300) + '...';
+                    lines.push(keys[k] + ': ' + valStr);
+                }
+            }
+            return lines.join('\n');
+        }
+
+        function formatToolResult(c) {
+            var text = '';
+            if (typeof c.content === 'string') {
+                text = c.content;
+            } else if (Array.isArray(c.content)) {
+                var parts = [];
+                for (var i = 0; i < c.content.length; i++) {
+                    var part = c.content[i];
+                    if (typeof part === 'string') parts.push(part);
+                    else if (part && part.text) parts.push(part.text);
+                    else if (part && part.type === 'image') parts.push('[Image]');
+                    else parts.push(JSON.stringify(part));
+                }
+                text = parts.join('\n');
+            } else if (c.output) {
+                text = typeof c.output === 'string' ? c.output : JSON.stringify(c.output);
+            }
+
+            if (c.is_error) text = '[ERROR] ' + text;
+            if (!text && c.tool_use_id) text = '(empty result for tool_use_id: ' + c.tool_use_id + ')';
+            if (!text) text = '(empty tool result)';
+
+            // Truncate very long results
+            if (text.length > 3000) {
+                text = text.substring(0, 3000) + '\n... [truncated, ' + text.length + ' chars total]';
+            }
+            return text;
+        }
+
+        function extractContent(entry) {
+            // Handle progress and hook_progress entries
+            if (entry.type === 'progress' || entry.type === 'hook_progress') {
+                if (entry.data && typeof entry.data === 'object') {
+                    var parts = [];
+                    if (entry.data.hookName) parts.push('Hook: ' + entry.data.hookName);
+                    if (entry.data.toolName) parts.push('Tool: ' + entry.data.toolName);
+                    if (entry.data.tool_name) parts.push('Tool: ' + entry.data.tool_name);
+                    if (entry.data.command) parts.push('Command: ' + entry.data.command);
+                    if (entry.data.status) parts.push('Status: ' + entry.data.status);
+                    if (entry.data.message) parts.push(typeof entry.data.message === 'string' ? entry.data.message : JSON.stringify(entry.data.message, null, 2));
+                    if (entry.data.content) parts.push(typeof entry.data.content === 'string' ? entry.data.content : JSON.stringify(entry.data.content));
+                    if (parts.length > 0) return parts.join('\n');
+                    return JSON.stringify(entry.data);
+                }
+            }
+
+            // Handle file-history-snapshot entries
+            if (entry.type === 'file-history-snapshot') {
+                if (entry.data && typeof entry.data === 'object') {
+                    var files = entry.data.files || entry.data.paths || entry.data;
+                    if (Array.isArray(files)) {
+                        return 'Files snapshotted (' + files.length + '):\n' + files.map(function(f) {
+                            return typeof f === 'string' ? '  ' + f : '  ' + (f.path || f.file_path || JSON.stringify(f));
+                        }).join('\n');
+                    }
+                    if (entry.message && typeof entry.message === 'object' && entry.message.content) {
+                        // fall through to message handling
+                    } else {
+                        return JSON.stringify(entry.data, null, 2);
+                    }
+                }
+            }
+
+            if (entry.message && typeof entry.message === 'object') {
+                var msg = entry.message;
+                if (msg.content) {
+                    if (typeof msg.content === 'string') return msg.content;
+                    if (Array.isArray(msg.content)) {
+                        return msg.content.map(function(c) {
+                            if (typeof c === 'string') return c;
+                            if (c && c.type === 'thinking') return '[Thinking]\n' + (c.thinking || c.text || '');
+                            if (c && c.type === 'tool_use') return formatToolUse(c);
+                            if (c && c.type === 'tool_result') return formatToolResult(c);
+                            if (c && c.text) return c.text;
+                            if (c && c.type === 'image') return '[Image]';
+                            return JSON.stringify(c);
+                        }).join('\n\n');
+                    }
+                }
+            }
+            // Handle Copilot-specific event types
+            if (entry.provider === 'copilot' && entry.data && typeof entry.data === 'object') {
+                var d = entry.data;
+                if (entry.type === 'user.message') return d.content || d.transformedContent || '';
+                if (entry.type === 'assistant.message') {
+                    var cparts = [];
+                    if (d.content) cparts.push(d.content);
+                    if (d.toolRequests && Array.isArray(d.toolRequests)) {
+                        d.toolRequests.forEach(function(tr) {
+                            cparts.push('[Tool Call] ' + (tr.name || 'unknown') + ': ' + JSON.stringify(tr.arguments || {}, null, 2));
+                        });
+                    }
+                    if (d.reasoningText) cparts.push('[Thinking]\n' + d.reasoningText);
+                    return cparts.join('\n\n') || JSON.stringify(d, null, 2);
+                }
+                if (entry.type === 'tool.execution_start') {
+                    var tParts = ['Tool: ' + (d.toolName || 'unknown')];
+                    if (d.arguments) {
+                        var args = typeof d.arguments === 'string' ? d.arguments : JSON.stringify(d.arguments, null, 2);
+                        // Show compact version for known tools
+                        var tn = (d.toolName || '').toLowerCase();
+                        if (typeof d.arguments === 'object' && d.arguments !== null) {
+                            if (tn === 'powershell' || tn === 'bash' || tn === 'execute') {
+                                if (d.arguments.command) tParts.push('Command: ' + d.arguments.command);
+                                if (d.arguments.description) tParts.push('Description: ' + d.arguments.description);
+                            } else if (tn === 'view' || tn === 'read') {
+                                if (d.arguments.path || d.arguments.file_path) tParts.push('Path: ' + (d.arguments.path || d.arguments.file_path));
+                                if (d.arguments.view_range) tParts.push('Range: ' + JSON.stringify(d.arguments.view_range));
+                            } else if (tn === 'edit') {
+                                if (d.arguments.path || d.arguments.file_path) tParts.push('Path: ' + (d.arguments.path || d.arguments.file_path));
+                                if (d.arguments.old_str != null) { var os = d.arguments.old_str; tParts.push('old_str: ' + (os.length > 200 ? os.substring(0,200) + '...' : os)); }
+                                if (d.arguments.new_str != null) { var ns = d.arguments.new_str; tParts.push('new_str: ' + (ns.length > 200 ? ns.substring(0,200) + '...' : ns)); }
+                            } else if (tn === 'create') {
+                                if (d.arguments.path) tParts.push('Path: ' + d.arguments.path);
+                                if (d.arguments.file_text) { var ft = d.arguments.file_text; tParts.push('Content: ' + (ft.length > 200 ? ft.substring(0,200) + '...' : ft)); }
+                            } else if (tn === 'grep') {
+                                if (d.arguments.pattern) tParts.push('Pattern: ' + d.arguments.pattern);
+                                if (d.arguments.path) tParts.push('Path: ' + d.arguments.path);
+                            } else if (tn === 'glob') {
+                                if (d.arguments.pattern) tParts.push('Pattern: ' + d.arguments.pattern);
+                            } else if (tn === 'web_search') {
+                                if (d.arguments.query) tParts.push('Query: ' + d.arguments.query);
+                            } else if (tn === 'task') {
+                                if (d.arguments.description) tParts.push('Description: ' + d.arguments.description);
+                                if (d.arguments.agent_type) tParts.push('Agent: ' + d.arguments.agent_type);
+                            } else {
+                                tParts.push(args.length > 500 ? args.substring(0, 500) + '...' : args);
+                            }
+                        } else {
+                            tParts.push(args.length > 500 ? args.substring(0, 500) + '...' : args);
+                        }
+                    }
+                    return tParts.join('\n');
+                }
+                if (entry.type === 'tool.execution_complete') {
+                    var rparts = ['Tool: ' + (d.toolName || d.toolCallId || 'unknown')];
+                    if (d.success !== undefined) rparts.push('Success: ' + d.success);
+                    if (d.result) {
+                        if (d.result.content) {
+                            var rc = d.result.content;
+                            rparts.push(rc.length > 2000 ? rc.substring(0, 2000) + '\n... [truncated]' : rc);
+                        }
+                        if (d.result.detailedContent) {
+                            var dc = d.result.detailedContent;
+                            rparts.push(dc.length > 2000 ? dc.substring(0, 2000) + '\n... [truncated]' : dc);
+                        }
+                    }
+                    return rparts.join('\n');
+                }
+                if (entry.type === 'session.start') {
+                    var sParts = ['Session started'];
+                    if (d.producer) sParts.push('Producer: ' + d.producer);
+                    if (d.copilotVersion) sParts.push('Version: ' + d.copilotVersion);
+                    if (d.startTime) sParts.push('Time: ' + new Date(d.startTime).toLocaleString());
+                    if (d.context) {
+                        if (d.context.cwd) sParts.push('CWD: ' + d.context.cwd);
+                        if (d.context.branch) sParts.push('Branch: ' + d.context.branch);
+                        if (d.context.repository) sParts.push('Repository: ' + d.context.repository);
+                    }
+                    return sParts.join('\n');
+                }
+                if (entry.type === 'session.task_complete') {
+                    var tcParts = ['Task completed'];
+                    if (d.summary) tcParts.push(d.summary);
+                    return tcParts.join('\n');
+                }
+                if (entry.type === 'subagent.started') {
+                    var saParts = ['Sub-agent started'];
+                    if (d.agentType) saParts.push('Type: ' + d.agentType);
+                    if (d.description) saParts.push('Task: ' + d.description);
+                    return saParts.join('\n');
+                }
+                if (entry.type === 'subagent.completed') {
+                    var scParts = ['Sub-agent completed'];
+                    if (d.agentType) scParts.push('Type: ' + d.agentType);
+                    if (d.success !== undefined) scParts.push('Success: ' + d.success);
+                    if (d.result) scParts.push(typeof d.result === 'string' ? d.result : JSON.stringify(d.result, null, 2));
+                    return scParts.join('\n');
+                }
+                if (entry.type === 'session.mode_changed') {
+                    return 'Mode changed' + (d.mode ? ' to: ' + d.mode : '') + (d.reason ? '\nReason: ' + d.reason : '');
+                }
+                if (entry.type === 'session.compaction_start') return 'Compaction started';
+                if (entry.type === 'session.compaction_complete') return 'Compaction complete';
+                if (entry.type === 'session.plan_changed') {
+                    return 'Plan updated' + (d.plan ? '\n' + d.plan : '');
+                }
+                if (entry.type === 'session.resume') return 'Session resumed';
+                if (entry.type === 'abort') return 'Operation aborted' + (d.reason ? ': ' + d.reason : '');
+                if (entry.type === 'assistant.turn_start') return 'Turn started';
+                if (entry.type === 'assistant.turn_end') return 'Turn ended';
+                if (entry.type === 'session.info' || entry.type === 'session.warning') {
+                    return d.message || JSON.stringify(d, null, 2);
+                }
+                // Fallback for unknown Copilot event types
+                return JSON.stringify(d, null, 2);
+            }
+            if (entry.data && typeof entry.data === 'object') {
+                if (entry.data.type) return '[' + entry.data.type + '] ' + (entry.data.command || entry.data.hookName || '');
+                return JSON.stringify(entry.data, null, 2);
+            }
+            // Fallback: show raw message JSON for entries with an object message but no content property
+            if (entry.message && typeof entry.message === 'object') {
+                var raw = JSON.stringify(entry.message, null, 2);
+                return raw.length > 3000 ? raw.substring(0, 3000) + '\n... [truncated]' : raw;
+            }
+            return null;
+        }
+
+        function expandContent(idx, btn) {
+            var el = document.getElementById('content-' + idx);
+            if (!el) return;
+            var filtered = currentEntries.filter(function(e) { return e.type && activeFilters.has(e.type); });
+            var entry = filtered[idx];
+            if (!entry) return;
+            var full = extractContent(entry);
+            var useMarkdown = document.getElementById('chkMarkdown') && document.getElementById('chkMarkdown').checked;
+            if (useMarkdown && typeof SimpleMarkdown !== 'undefined') {
+                el.innerHTML = SimpleMarkdown.render(full);
+                el.classList.add('md-rendered');
+            } else {
+                el.textContent = full;
+            }
+            el.classList.remove('truncated');
+            btn.remove();
+        }
+
+        // --- Auto-scroll ---
+        function autoScrollToBottom() {
+            if (!document.getElementById('chkAutoScroll').checked) return;
+            var container = document.getElementById('transcriptContent');
+            if (container) {
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+
+        // --- Export ---
+        function exportTranscript(format) {
+            if (!currentEntries || currentEntries.length === 0) {
+                Toast.show('Export', 'No transcript data to export', 'warning');
+                return;
+            }
+
+            var sessionId = currentSessionId || 'transcript';
+
+            if (format === 'json') {
+                var json = JSON.stringify(currentEntries, null, 2);
+                downloadFile(json, sessionId + '.json', 'application/json');
+            } else if (format === 'html') {
+                var html = generateHtmlExport(currentEntries, sessionId);
+                downloadFile(html, sessionId + '.html', 'text/html');
+            }
+        }
+
+        function generateHtmlExport(entries, sessionId) {
+            var rows = entries.map(function(e) {
+                var type = e.type || 'unknown';
+                var time = e.timestamp ? new Date(e.timestamp).toLocaleString() : '';
+                var role = e.message && typeof e.message === 'object' ? (e.message.role || '') : '';
+                var content = extractContent(e) || '';
+                var color = type === 'user' ? '#2563eb' : type === 'assistant' ? '#16a34a' : type === 'progress' ? '#d97706' : '#7c3aed';
+                return '<div style="padding:8px 12px;margin:6px 0;border-left:3px solid ' + color + ';background:#fafafa;border-radius:4px;">' +
+                    '<div style="font-size:0.8em;color:#666;margin-bottom:4px;"><strong>' + escapeHtml(type) + '</strong>' +
+                    (role ? ' - ' + escapeHtml(role) : '') + ' <span style="float:right;">' + escapeHtml(time) + '</span></div>' +
+                    '<div style="white-space:pre-wrap;word-break:break-word;">' + escapeHtml(content) + '</div></div>';
+            }).join('\n');
+
+            return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Transcript: ' + escapeHtml(sessionId) + '</title>' +
+                '<style>body{font-family:-apple-system,system-ui,sans-serif;max-width:900px;margin:0 auto;padding:20px;color:#1a1a2e;}</style></head><body>' +
+                '<h1>Session Transcript</h1><p>Session: <code>' + escapeHtml(sessionId) + '</code></p>' +
+                '<p>Exported: ' + new Date().toLocaleString() + ' | Entries: ' + entries.length + '</p><hr>' +
+                rows + '</body></html>';
+        }
+
+        function downloadFile(content, filename, mimeType) {
+            var blob = new Blob([content], { type: mimeType });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // --- Navigation ---
+        function backToBrowser(skipPushState) {
+            closeSse();
+            currentSessionId = null;
+            document.getElementById('transcriptView').style.display = 'none';
+            document.getElementById('browserView').style.display = '';
+            if (!skipPushState) {
+                history.pushState({ view: 'browser' }, '', window.location.pathname);
+            }
+        }
+
+        // --- Deep link: find project for a session ID and open it ---
+        async function openSessionFromUrl(sessionId) {
+            // Wait for projects to load first
+            await loadProjects();
+
+            // Search all projects for this session
+            for (var i = 0; i < allProjects.length; i++) {
+                var sessions = allProjects[i].sessions || [];
+                for (var j = 0; j < sessions.length; j++) {
+                    if (sessions[j].sessionId === sessionId) {
+                        // Found it - expand tree path, select project, open transcript
+                        expandPathToProject(i);
+                        selectProject(i);
+                        viewTranscript(sessionId);
+                        return;
+                    }
+                }
+            }
+
+            // Session not found in any project - try opening directly anyway
+            viewTranscript(sessionId);
+        }
+
+        // --- Browser back/forward navigation ---
+        window.addEventListener('popstate', function(e) {
+            var state = e.state;
+            if (state && state.view === 'transcript' && state.sessionId) {
+                viewTranscript(state.sessionId, true);
+            } else {
+                backToBrowser(true);
+            }
+        });
+
+        // --- Event handlers ---
+        document.addEventListener('DOMContentLoaded', function() {
+            // Restore checkbox states
+            var chkAutoScroll = document.getElementById('chkAutoScroll');
+            if (chkAutoScroll) chkAutoScroll.checked = loadFilter('cpa-transcript-autoscroll', true);
+
+            var chkMarkdown = document.getElementById('chkMarkdown');
+            if (chkMarkdown) chkMarkdown.checked = loadFilter('cpa-transcript-markdown', false);
+
+            var chkLive = document.getElementById('chkLive');
+            if (chkLive) chkLive.checked = loadFilter('cpa-transcript-live', true);
+
+            var chkTokenUsage = document.getElementById('chkTokenUsage');
+            if (chkTokenUsage) chkTokenUsage.checked = loadFilter('cpa-transcript-tokens', false);
+
+            var chkRepoView = document.getElementById('chkRepoView');
+            if (chkRepoView) chkRepoView.checked = loadFilter('cpa-transcript-repoview', false);
+
+            loadProjects();
+
+            // Set initial history state for browser view so popstate works correctly
+            var urlSession = new URLSearchParams(window.location.search).get('session');
+            if (urlSession) {
+                // Deep link: replace current state with browser, then open the session
+                history.replaceState({ view: 'browser' }, '', window.location.pathname);
+                openSessionFromUrl(urlSession);
+            } else {
+                history.replaceState({ view: 'browser' }, '', window.location.pathname + window.location.search);
+            }
+
+            if (chkAutoScroll) {
+                chkAutoScroll.addEventListener('change', function() {
+                    saveFilter('cpa-transcript-autoscroll', this.checked);
+                });
+            }
+
+            chkMarkdown.addEventListener('change', function() {
+                saveFilter('cpa-transcript-markdown', this.checked);
+                renderTranscript();
+                autoScrollToBottom();
+            });
+
+            chkLive.addEventListener('change', function() {
+                saveFilter('cpa-transcript-live', this.checked);
+                if (this.checked && currentSessionId) {
+                    startSse(currentSessionId);
+                } else {
+                    closeSse();
+                }
+            });
+
+            if (chkTokenUsage) {
+                chkTokenUsage.addEventListener('change', function() {
+                    saveFilter('cpa-transcript-tokens', this.checked);
+                    var useRepo = document.getElementById('chkRepoView') && document.getElementById('chkRepoView').checked;
+                    if (useRepo) {
+                        // Repo view needs re-render to add/remove repo-tokens elements
+                        loadProjects();
+                    } else {
+                        // Re-render the active project's session list
+                        var activeCard = document.querySelector('.project-card.active');
+                        if (activeCard) selectProject(parseInt(activeCard.dataset.idx));
+                        // Clear or show project token summaries
+                        if (!this.checked) {
+                            for (var pi = 0; pi < allProjects.length; pi++) {
+                                var el = document.getElementById('project-tokens-' + pi);
+                                if (el) el.innerHTML = '';
+                            }
+                        } else {
+                            updateProjectTokenSummary();
+                        }
+                    }
+                });
+            }
+
+            if (chkRepoView) {
+                chkRepoView.addEventListener('change', function() {
+                    saveFilter('cpa-transcript-repoview', this.checked);
+                    loadProjects();
+                });
+            }
+        });
+    </script>
+</body>
+</html>

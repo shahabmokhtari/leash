@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logs - Leash</title>
+    <script>(function(){var t=localStorage.getItem('cpa-theme');if(t)document.documentElement.setAttribute('data-theme',t);else if(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.setAttribute('data-theme','dark');})()</script>
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        .chip-filter-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+        .chip-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .chip-group-label { font-size: 0.75em; font-weight: 600; color: var(--text-faint, #888); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+        .filter-chip {
+            font-size: 0.8em; padding: 4px 10px; border-radius: 12px; border: 1px solid var(--border-color, #ddd);
+            cursor: pointer; background: var(--bg-secondary, #fff); color: var(--text-primary, #1a1a2e); transition: all 0.15s;
+            user-select: none; white-space: nowrap;
+        }
+        .filter-chip.active { background: var(--accent-primary, #2563eb); color: #fff; border-color: var(--accent-primary, #2563eb); }
+        .filter-chip.toggle-all { font-weight: 600; }
+        .filter-chip.show-more { font-style: italic; opacity: 0.85; }
+        .filter-chip.hidden-chip { display: none; }
+    </style>
+</head>
+<body>
+    <a href="#main" class="skip-link">Skip to main content</a>
+
+    <div class="container">
+        <header>
+            <div class="header-brand"><h1>Leash</h1><span class="motto">Leash the Harness</span></div>
+            <div class="header-right">
+                <div class="status" role="status" aria-label="Service connection status">
+                    <span class="status-indicator" aria-hidden="true"></span>
+                    <span class="status-label">Checking...</span>
+                </div>
+                <button id="btnAutoStart" class="btn-autostart" title="Toggle auto-start (SessionStart hook)" aria-label="Toggle auto-start">&#x23F5;</button>
+                <button id="btnShutdown" class="btn-shutdown" title="Shut down Leash server" aria-label="Shut down Leash server">&#x23FB;</button>
+                <button id="themeToggle" class="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode (D)">&#9790;</button>
+            </div>
+        </header>
+
+        <nav aria-label="Main navigation" role="navigation">
+            <a href="/">Dashboard</a>
+            <a href="/logs.html" class="active" aria-current="page">Live Logs</a>
+            <a href="/transcripts.html">Transcripts</a>
+            <a href="/prompts.html">Prompt Editor</a>
+            <a href="/config.html">Leash Settings</a>
+            <a href="/claude-settings.html">Claude Settings</a>
+            <a href="/copilot-settings.html">Copilot Settings</a>
+        </nav>
+
+        <main id="main">
+            <div class="breadcrumbs" aria-label="Breadcrumb">
+                <a href="/">Home</a>
+                <span class="separator" aria-hidden="true">/</span>
+                <span class="current">Logs</span>
+            </div>
+
+            <div class="card">
+                <div class="logs-toolbar">
+                    <div class="filter-group" role="group" aria-label="Log filters">
+                        <div class="chip-filter-row">
+                            <div class="chip-group">
+                                <span class="chip-group-label">Harness:</span>
+                                <span id="chipGroup-harness" aria-label="Filter by harness"></span>
+                            </div>
+                            <div class="chip-group">
+                                <span class="chip-group-label">Hook Type:</span>
+                                <span id="chipGroup-hookType" aria-label="Filter by hook type"></span>
+                            </div>
+                            <div class="chip-group">
+                                <span class="chip-group-label">Tool:</span>
+                                <span id="chipGroup-toolName" aria-label="Filter by tool"></span>
+                            </div>
+                            <div class="chip-group">
+                                <span class="chip-group-label">Category:</span>
+                                <span id="chipGroup-category" aria-label="Filter by category"></span>
+                            </div>
+                            <div class="chip-group">
+                                <span class="chip-group-label">Decision:</span>
+                                <span id="chipGroup-decision" aria-label="Filter by decision"></span>
+                            </div>
+                        </div>
+
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                            <label for="filterSession" class="sr-only">Filter by session</label>
+                            <select id="filterSession" class="filter-select" aria-label="Filter by session">
+                                <option value="">All Sessions</option>
+                            </select>
+
+                            <label for="filterLimit" class="sr-only">Number of entries</label>
+                            <select id="filterLimit" class="filter-select" aria-label="Number of entries to show">
+                                <option value="50">50 entries</option>
+                                <option value="100" selected>100 entries</option>
+                                <option value="200">200 entries</option>
+                                <option value="500">500 entries</option>
+                            </select>
+
+                            <span id="logCount" style="font-size: 12px; color: var(--text-faint);">Loading...</span>
+                        </div>
+                    </div>
+
+                    <div class="btn-group" style="display:flex;align-items:center;gap:8px;">
+                        <label style="display:inline-flex;align-items:center;gap:4px;font-size:0.8em;cursor:pointer;user-select:none;"><input type="checkbox" id="chkAutoScrollLogs" checked> Auto-scroll</label>
+                        <label style="display:inline-flex;align-items:center;gap:4px;font-size:0.8em;cursor:pointer;user-select:none;"><input type="checkbox" id="chkAutoRefreshLogs" checked> Live (5s)</label>
+                        <button class="btn btn-sm" onclick="exportLogs('csv')" aria-label="Export logs as CSV">Export CSV</button>
+                        <button class="btn btn-sm" onclick="exportLogs('json')" aria-label="Export logs as JSON">Export JSON</button>
+                        <button class="btn btn-sm" onclick="clearLogs()" aria-label="Clear all logs" style="color:var(--color-danger,#dc2626);">Clear Logs</button>
+                        <button class="btn btn-sm" onclick="refreshData()" aria-label="Refresh logs">Refresh</button>
+                    </div>
+                </div>
+
+                <div class="log-columns-header" role="row" aria-hidden="true">
+                    <span>Time</span>
+                    <span>Client</span>
+                    <span>Type</span>
+                    <span>Tool</span>
+                    <span>Details</span>
+                    <span>Decision</span>
+                    <span>Score</span>
+                    <span>Session</span>
+                    <span></span>
+                </div>
+
+                <div id="logEntries" role="table" aria-label="Permission log entries">
+                    <div class="empty-state">
+                        <p>Loading logs...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast container -->
+    <div id="toastContainer" class="toast-container" role="status" aria-live="polite"></div>
+
+    <!-- Keyboard Shortcuts Modal -->
+    <div id="shortcutsModal" class="modal-overlay" role="dialog" aria-label="Keyboard shortcuts" aria-modal="true">
+        <div class="modal">
+            <h2>Keyboard Shortcuts</h2>
+            <ul class="shortcut-list">
+                <li class="shortcut-item">
+                    <span>Toggle dark mode</span>
+                    <span class="shortcut-key"><kbd>D</kbd></span>
+                </li>
+                <li class="shortcut-item">
+                    <span>Refresh data</span>
+                    <span class="shortcut-key"><kbd>R</kbd></span>
+                </li>
+                <li class="shortcut-item">
+                    <span>Go to Dashboard</span>
+                    <span class="shortcut-key"><kbd>1</kbd></span>
+                </li>
+                <li class="shortcut-item">
+                    <span>Go to Logs</span>
+                    <span class="shortcut-key"><kbd>2</kbd></span>
+                </li>
+                <li class="shortcut-item">
+                    <span>Go to Configuration</span>
+                    <span class="shortcut-key"><kbd>3</kbd></span>
+                </li>
+                <li class="shortcut-item">
+                    <span>Toggle terminal</span>
+                    <span class="shortcut-key"><kbd>T</kbd></span>
+                </li>
+                <li class="shortcut-item">
+                    <span>Show shortcuts</span>
+                    <span class="shortcut-key"><kbd>?</kbd></span>
+                </li>
+                <li class="shortcut-item">
+                    <span>Close modal</span>
+                    <span class="shortcut-key"><kbd>Esc</kbd></span>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="/js/shared.js"></script>
+    <script src="/js/logs.js"></script>
+</body>
+</html>

@@ -1,0 +1,57 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "leash"
+version = "0.1.0"
+description = "Observe and enforce Claude Code permission requests via LLM-based safety analysis"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [{ name = "Leash Contributors" }]
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "pydantic>=2.0",
+    "aiofiles>=24.1.0",
+    "httpx>=0.27.0",
+    "sse-starlette>=2.0.0",
+    "watchfiles>=1.0.0",
+    "pystray>=0.19.0",
+    "Pillow>=10.0.0",
+    "windows-toasts>=1.2.0; sys_platform == 'win32'",
+]
+
+[project.optional-dependencies]
+tray = ["pystray>=0.19.0", "Pillow>=10.0.0", "windows-toasts>=1.2.0; sys_platform == 'win32'"]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-asyncio>=0.24.0",
+    "pytest-mock>=3.14.0",
+    "httpx>=0.27.0",
+    "ruff>=0.8.0",
+]
+all = ["leash[tray,dev]"]
+
+[project.scripts]
+leash = "leash.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/leash"]
+
+[tool.hatch.build.targets.wheel.shared-data]
+"prompts" = "share/leash/prompts"
+"scripts" = "share/leash/scripts"
+"static" = "share/leash/static"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuration - Leash</title>
+    <script>(function(){var t=localStorage.getItem('cpa-theme');if(t)document.documentElement.setAttribute('data-theme',t);else if(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.setAttribute('data-theme','dark');})()</script>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <a href="#main" class="skip-link">Skip to main content</a>
+
+    <div class="container">
+        <header>
+            <div class="header-brand"><h1>Leash</h1><span class="motto">Leash the Harness</span></div>
+            <div class="header-right">
+                <div class="status" role="status" aria-label="Service connection status">
+                    <span class="status-indicator" aria-hidden="true"></span>
+                    <span class="status-label">Checking...</span>
+                </div>
+                <button id="btnAutoStart" class="btn-autostart" title="Toggle auto-start (SessionStart hook)" aria-label="Toggle auto-start">&#x23F5;</button>
+                <button id="btnShutdown" class="btn-shutdown" title="Shut down Leash server" aria-label="Shut down Leash server">&#x23FB;</button>
+                <button id="themeToggle" class="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode (D)">&#9790;</button>
+            </div>
+        </header>
+
+        <nav aria-label="Main navigation" role="navigation">
+            <a href="/">Dashboard</a>
+            <a href="/logs.html">Live Logs</a>
+            <a href="/transcripts.html">Transcripts</a>
+            <a href="/prompts.html">Prompt Editor</a>
+            <a href="/config.html" class="active" aria-current="page">Leash Settings</a>
+            <a href="/claude-settings.html">Claude Settings</a>
+            <a href="/copilot-settings.html">Copilot Settings</a>
+        </nav>
+
+        <main id="main">
+            <div class="breadcrumbs" aria-label="Breadcrumb">
+                <a href="/">Home</a>
+                <span class="separator" aria-hidden="true">/</span>
+                <span class="current">Configuration</span>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2>Service Configuration</h2>
+                    <button class="btn btn-sm" onclick="loadConfig()" aria-label="Reload configuration">Reload</button>
+                </div>
+
+                <div id="configContent">
+                    <div class="empty-state">
+                        <p>Loading configuration...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2>Hook Handlers</h2>
+                    <button class="btn btn-sm" onclick="loadConfig()" aria-label="Reload hook handlers">Reload</button>
+                </div>
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+                    Configure how each hook event type is processed. Each event can have multiple handlers with different matchers, modes, and thresholds. Use the Client field to target Claude, Copilot, or both.
+                </p>
+                <div id="hookHandlersContent">
+                    <div class="empty-state">
+                        <p>Loading hook handlers...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast container -->
+    <div id="toastContainer" class="toast-container" role="status" aria-live="polite"></div>
+
+    <!-- Keyboard Shortcuts Modal -->
+    <div id="shortcutsModal" class="modal-overlay" role="dialog" aria-label="Keyboard shortcuts" aria-modal="true">
+        <div class="modal">
+            <h2>Keyboard Shortcuts</h2>
+            <ul class="shortcut-list">
+                <li class="shortcut-item">
+                    <span>Toggle dark mode</span>
+                    <span class="shortcut-key"><kbd>D</kbd></span>
+                </li>
+                <li class="shortcut-item">
+                    <span>Refresh data</span>
+                    <span class="shortcut-key"><kbd>R</kbd></span>
+                </li>
+                <li class="shortcut-item">
+                    <span>Go to Dashboard</span>
+                    <span class="shortcut-key"><kbd>1</kbd></span>
+                </li>
+                <li class="shortcut-item">
+                    <span>Go to Logs</span>
+                    <span class="shortcut-key"><kbd>2</kbd></span>
+                </li>
+                <li class="shortcut-item">
+                    <span>Go to Configuration</span>
+                    <span class="shortcut-key"><kbd>3</kbd></span>
+                </li>
+                <li class="shortcut-item">
+                    <span>Toggle terminal</span>
+                    <span class="shortcut-key"><kbd>T</kbd></span>
+                </li>
+                <li class="shortcut-item">
+                    <span>Show shortcuts</span>
+                    <span class="shortcut-key"><kbd>?</kbd></span>
+                </li>
+                <li class="shortcut-item">
+                    <span>Close modal</span>
+                    <span class="shortcut-key"><kbd>Esc</kbd></span>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="/js/shared.js"></script>
+    <script src="/js/config.js"></script>
+</body>
+</html>

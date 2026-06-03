@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Copilot Settings - Leash</title>
+    <script>(function(){var t=localStorage.getItem('cpa-theme');if(t)document.documentElement.setAttribute('data-theme',t);else if(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.setAttribute('data-theme','dark');})()</script>
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        .editor-toolbar {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 12px; flex-wrap: wrap; gap: 8px;
+        }
+        .editor-path { font-size: 0.85em; color: var(--text-muted, #666); font-family: monospace; }
+        .editor-status { font-size: 0.85em; padding: 2px 8px; border-radius: 12px; }
+        .status-valid { background: rgba(34,197,94,0.15); color: var(--color-success, #16a34a); }
+        .status-invalid { background: rgba(239,68,68,0.15); color: var(--color-danger, #dc2626); }
+        .status-missing { background: var(--bg-tertiary, #f3f4f6); color: var(--text-muted, #666); }
+
+        /* Line numbers gutter */
+        .code-editor-wrapper {
+            display: flex;
+            border: 1px solid var(--border-color, #ddd);
+            border-radius: 6px;
+            overflow: hidden;
+            background: var(--bg-primary, #fff);
+        }
+        .code-editor-wrapper:focus-within {
+            outline: 2px solid var(--accent-primary, #2563eb);
+            border-color: transparent;
+        }
+        .line-numbers {
+            padding: 12px 0;
+            background: var(--bg-tertiary, #f3f4f6);
+            color: var(--text-muted, #999);
+            font-family: monospace; font-size: 13px; line-height: 1.5;
+            text-align: right;
+            user-select: none;
+            min-width: 40px;
+            border-right: 1px solid var(--border-color, #ddd);
+            overflow: hidden;
+        }
+        .line-numbers div {
+            padding: 0 8px 0 8px;
+        }
+        .line-numbers div.error-line {
+            background: rgba(239,68,68,0.15);
+            color: var(--color-danger, #dc2626);
+            font-weight: 700;
+        }
+
+        /* Overlay editor: highlight layer behind, textarea on top */
+        .code-editor-container {
+            position: relative;
+            flex: 1;
+            overflow: hidden;
+        }
+        .highlight-layer {
+            position: absolute; top: 0; left: 0; right: 0;
+            padding: 12px;
+            font-family: monospace; font-size: 13px; line-height: 1.5;
+            white-space: pre; overflow-x: auto;
+            pointer-events: none;
+            color: transparent;
+        }
+        .code-textarea {
+            position: relative;
+            width: 100%; min-height: 200px;
+            padding: 12px;
+            font-family: monospace; font-size: 13px; line-height: 1.5;
+            border: none; outline: none; resize: none;
+            background: transparent;
+            color: var(--text-primary, #1a1a2e);
+            caret-color: var(--text-primary, #1a1a2e);
+            white-space: pre; overflow-x: auto;
+            tab-size: 2;
+            overflow-y: hidden;
+        }
+        /* When highlight is active, make textarea text invisible so highlight shows through */
+        .code-textarea.hl-active {
+            color: transparent;
+            caret-color: var(--text-primary, #1a1a2e);
+        }
+
+        /* Syntax colors */
+        .hl-key { color: #881391; }
+        .hl-string { color: #0451a5; }
+        .hl-number { color: #098658; }
+        .hl-bool { color: #0000ff; }
+        .hl-null { color: #808080; }
+        .hl-brace { color: var(--text-muted, #666); }
+        .hl-colon { color: var(--text-primary, #1a1a2e); }
+        .hl-comma { color: var(--text-muted, #666); }
+        .hl-error { color: var(--color-danger, #dc2626); text-decoration: wavy underline var(--color-danger, #dc2626); }
+
+        [data-theme="dark"] .hl-key { color: #c586c0; }
+        [data-theme="dark"] .hl-string { color: #ce9178; }
+        [data-theme="dark"] .hl-number { color: #b5cea8; }
+        [data-theme="dark"] .hl-bool { color: #569cd6; }
+        [data-theme="dark"] .hl-null { color: #808080; }
+
+        /* Error banner */
+        .json-error-banner {
+            padding: 8px 12px;
+            background: rgba(239,68,68,0.08);
+            border-top: 1px solid rgba(239,68,68,0.2);
+            color: var(--color-danger, #dc2626);
+            font-family: monospace; font-size: 12px;
+            display: none;
+            border-radius: 0 0 6px 6px;
+        }
+        .json-error-banner.visible { display: block; }
+    </style>
+</head>
+<body>
+    <a href="#main" class="skip-link">Skip to main content</a>
+
+    <div class="container">
+        <header>
+            <div class="header-brand"><h1>Leash</h1><span class="motto">Leash the Harness</span></div>
+            <div class="header-right">
+                <div class="status" role="status" aria-label="Service connection status">
+                    <span class="status-indicator" aria-hidden="true"></span>
+                    <span class="status-label">Checking...</span>
+                </div>
+                <button id="btnAutoStart" class="btn-autostart" title="Toggle auto-start (SessionStart hook)" aria-label="Toggle auto-start">&#x23F5;</button>
+                <button id="btnShutdown" class="btn-shutdown" title="Shut down Leash server" aria-label="Shut down Leash server">&#x23FB;</button>
+                <button id="themeToggle" class="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode (D)">&#9790;</button>
+            </div>
+        </header>
+
+        <nav aria-label="Main navigation" role="navigation">
+            <a href="/">Dashboard</a>
+            <a href="/logs.html">Live Logs</a>
+            <a href="/transcripts.html">Transcripts</a>
+            <a href="/prompts.html">Prompt Editor</a>
+            <a href="/config.html">Leash Settings</a>
+            <a href="/claude-settings.html">Claude Settings</a>
+            <a href="/copilot-settings.html" class="active" aria-current="page">Copilot Settings</a>
+        </nav>
+
+        <main id="main">
+            <div class="card">
+                <div class="editor-toolbar">
+                    <div>
+                        <h2 style="margin:0;">Copilot Settings</h2>
+                        <div class="editor-path" id="settingsPath">~/.copilot/hooks/hooks.json</div>
+                    </div>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <span class="editor-status" id="jsonStatus">Loading...</span>
+                        <button class="btn btn-sm" onclick="loadSettings()">Reload</button>
+                        <button class="btn btn-sm" onclick="formatJson()">Format</button>
+                        <button class="btn btn-sm" onclick="saveSettings()" id="btnSave" disabled>Save</button>
+                    </div>
+                </div>
+
+                <div class="code-editor-wrapper">
+                    <div class="line-numbers" id="lineNumbers"></div>
+                    <div class="code-editor-container" id="editorContainer">
+                        <pre class="highlight-layer" id="highlightLayer" aria-hidden="true"></pre>
+                        <textarea class="code-textarea hl-active" id="settingsEditor" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="Loading..."></textarea>
+                    </div>
+                </div>
+                <div class="json-error-banner" id="jsonErrorBanner"></div>
+            </div>
+        </main>
+    </div>
+
+    <div id="toastContainer" class="toast-container" role="status" aria-live="polite"></div>
+
+    <script src="/js/shared.js"></script>
+    <script>
+        var originalContent = '';
+        var errorLine = -1;
+
+        /* ---- Syntax Highlighting (character-by-character tokenizer) ---- */
+        function highlightJson(text) {
+            var result = '';
+            var i = 0;
+            var len = text.length;
+            while (i < len) {
+                var ch = text[i];
+                if (ch === '"') {
+                    // Read full string token (handles escapes correctly)
+                    var str = '"';
+                    i++;
+                    while (i < len) {
+                        if (text[i] === '\\' && i + 1 < len) {
+                            str += text[i] + text[i + 1];
+                            i += 2;
+                        } else if (text[i] === '"') {
+                            str += '"';
+                            i++;
+                            break;
+                        } else {
+                            str += text[i];
+                            i++;
+                        }
+                    }
+                    // Check if this string is a key (followed by whitespace then colon)
+                    var rest = text.substring(i);
+                    var isKey = /^\s*:/.test(rest);
+                    var cls = isKey ? 'hl-key' : 'hl-string';
+                    result += '<span class="' + cls + '">' + escapeHtml(str) + '</span>';
+                } else if (ch === '-' || (ch >= '0' && ch <= '9')) {
+                    var num = '';
+                    while (i < len && /[\d.eE+\-]/.test(text[i])) { num += text[i]; i++; }
+                    result += '<span class="hl-number">' + escapeHtml(num) + '</span>';
+                } else if (text.substr(i, 4) === 'true') {
+                    result += '<span class="hl-bool">true</span>'; i += 4;
+                } else if (text.substr(i, 5) === 'false') {
+                    result += '<span class="hl-bool">false</span>'; i += 5;
+                } else if (text.substr(i, 4) === 'null') {
+                    result += '<span class="hl-null">null</span>'; i += 4;
+                } else if (ch === '{' || ch === '}' || ch === '[' || ch === ']') {
+                    result += '<span class="hl-brace">' + ch + '</span>'; i++;
+                } else if (ch === ':') {
+                    result += '<span class="hl-colon">:</span>'; i++;
+                } else if (ch === ',') {
+                    result += '<span class="hl-comma">,</span>'; i++;
+                } else {
+                    result += escapeHtml(ch); i++;
+                }
+            }
+            return result;
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function updateHighlight() {
+            var textarea = document.getElementById('settingsEditor');
+            var highlight = document.getElementById('highlightLayer');
+            var text = textarea.value;
+
+            highlight.innerHTML = highlightJson(text) + '\n'; // trailing newline ensures same height
+            updateLineNumbers(text);
+            syncScroll();
+        }
+
+        function updateLineNumbers(text) {
+            var gutter = document.getElementById('lineNumbers');
+            var lines = text.split('\n');
+            var html = '';
+            for (var i = 0; i < lines.length; i++) {
+                var cls = (i + 1 === errorLine) ? ' class="error-line"' : '';
+                html += '<div' + cls + '>' + (i + 1) + '</div>';
+            }
+            gutter.innerHTML = html;
+        }
+
+        function syncScroll() {
+            var textarea = document.getElementById('settingsEditor');
+            var highlight = document.getElementById('highlightLayer');
+            var gutter = document.getElementById('lineNumbers');
+            var container = document.getElementById('editorContainer');
+            highlight.scrollTop = textarea.scrollTop;
+            highlight.scrollLeft = textarea.scrollLeft;
+            gutter.scrollTop = textarea.scrollTop;
+        }
+
+        function autoResize() {
+            var textarea = document.getElementById('settingsEditor');
+            textarea.style.height = '0';
+            var newHeight = Math.max(200, textarea.scrollHeight + 4);
+            textarea.style.height = newHeight + 'px';
+            document.getElementById('highlightLayer').style.height = newHeight + 'px';
+        }
+
+        /* ---- Tab key support ---- */
+        function handleTab(e) {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                var textarea = e.target;
+                var start = textarea.selectionStart;
+                var end = textarea.selectionEnd;
+                textarea.value = textarea.value.substring(0, start) + '  ' + textarea.value.substring(end);
+                textarea.selectionStart = textarea.selectionEnd = start + 2;
+                onEditorInput();
+            }
+        }
+
+        /* ---- Validation ---- */
+        function validateJson() {
+            var editor = document.getElementById('settingsEditor');
+            var status = document.getElementById('jsonStatus');
+            var banner = document.getElementById('jsonErrorBanner');
+            errorLine = -1;
+            try {
+                JSON.parse(editor.value);
+                status.textContent = 'Valid JSON';
+                status.className = 'editor-status status-valid';
+                banner.classList.remove('visible');
+                banner.textContent = '';
+                updateLineNumbers(editor.value);
+                return true;
+            } catch (e) {
+                var msg = e.message;
+                status.textContent = 'Invalid';
+                status.className = 'editor-status status-invalid';
+                banner.textContent = msg;
+                banner.classList.add('visible');
+
+                // Try to extract line number from error message
+                var lineMatch = msg.match(/line (\d+)/i) || msg.match(/position (\d+)/i);
+                if (lineMatch) {
+                    var pos = parseInt(lineMatch[1]);
+                    // If it's a position, count newlines up to that position
+                    if (msg.toLowerCase().includes('position')) {
+                        var textUpToPos = editor.value.substring(0, pos);
+                        errorLine = (textUpToPos.match(/\n/g) || []).length + 1;
+                    } else {
+                        errorLine = pos;
+                    }
+                }
+                updateLineNumbers(editor.value);
+                return false;
+            }
+        }
+
+        /* ---- Core operations ---- */
+        function onEditorInput() {
+            updateHighlight();
+            autoResize();
+            validateJson();
+        }
+
+        function formatJson() {
+            var editor = document.getElementById('settingsEditor');
+            try {
+                var parsed = JSON.parse(editor.value);
+                editor.value = JSON.stringify(parsed, null, 2);
+                onEditorInput();
+            } catch (e) {
+                Toast.show('Format Error', 'Cannot format: ' + e.message, 'danger');
+            }
+        }
+
+        async function loadSettings() {
+            var editor = document.getElementById('settingsEditor');
+            var status = document.getElementById('jsonStatus');
+            var pathEl = document.getElementById('settingsPath');
+            try {
+                var resp = await fetch('/api/copilot-settings');
+                if (!resp.ok) throw new Error('Failed to load');
+                var data = await resp.json();
+                pathEl.textContent = data.path;
+
+                if (!data.exists) {
+                    editor.value = '{\n  "version": 1,\n  "hooks": {\n    "preToolUse": [],\n    "postToolUse": []\n  }\n}';
+                    status.textContent = 'New file (will be created on save)';
+                    status.className = 'editor-status status-missing';
+                } else if (data.parseError) {
+                    editor.value = data.content;
+                    status.textContent = 'Invalid JSON';
+                    status.className = 'editor-status status-invalid';
+                } else {
+                    try { editor.value = JSON.stringify(JSON.parse(data.content), null, 2); }
+                    catch { editor.value = data.content; }
+                    status.textContent = 'Valid JSON';
+                    status.className = 'editor-status status-valid';
+                }
+                originalContent = editor.value;
+                document.getElementById('btnSave').disabled = false;
+                onEditorInput();
+            } catch (err) {
+                editor.value = '';
+                status.textContent = 'Error: ' + err.message;
+                status.className = 'editor-status status-invalid';
+            }
+        }
+
+        async function saveSettings() {
+            if (!validateJson()) {
+                Toast.show('Save Error', 'Fix JSON errors before saving', 'danger');
+                return;
+            }
+            var editor = document.getElementById('settingsEditor');
+            try {
+                var resp = await fetch('/api/copilot-settings', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: editor.value })
+                });
+                var data = await resp.json();
+                if (!resp.ok) throw new Error(data.error || 'Save failed');
+                originalContent = editor.value;
+                Toast.show('Saved', 'Copilot settings saved successfully', 'success');
+            } catch (err) {
+                Toast.show('Save Error', err.message, 'danger');
+            }
+        }
+
+        /* ---- Init ---- */
+        document.addEventListener('DOMContentLoaded', function() {
+            var textarea = document.getElementById('settingsEditor');
+            textarea.addEventListener('input', onEditorInput);
+            textarea.addEventListener('scroll', syncScroll);
+            textarea.addEventListener('keydown', handleTab);
+            loadSettings();
+        });
+    </script>
+</body>
+</html>

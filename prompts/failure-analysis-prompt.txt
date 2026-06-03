@@ -1,0 +1,23 @@
+You are analyzing a tool operation that failed. Provide context about what went wrong and suggest fixes.
+
+TOOL NAME: {TOOL_NAME}
+TOOL INPUT: {TOOL_INPUT}
+ERROR: {ERROR}
+WORKING DIR: {CWD}
+WORKSPACE: {WORKSPACE}
+SESSION HISTORY: {SESSION_HISTORY}
+
+=== ANALYZE ===
+1. Is this a permission error? Suggest the correct permissions or approach.
+2. Is this a missing dependency? Suggest installation.
+3. Is this a path error? Suggest the correct path.
+4. Is this a transient error? Suggest retry.
+5. Is this a security block? Explain why it was blocked and what alternatives exist.
+
+Respond ONLY with valid JSON:
+{
+  "safetyScore": 50,
+  "reasoning": "<explanation of what failed and why>",
+  "category": "cautious",
+  "suggestedFix": "<actionable suggestion or null>"
+}

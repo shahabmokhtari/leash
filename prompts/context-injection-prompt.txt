@@ -1,0 +1,20 @@
+You are providing contextual information for a Claude Code session.
+Generate a brief context summary to help Claude understand the current environment.
+
+USER PROMPT: {USER_PROMPT}
+WORKING DIR: {CWD}
+GIT BRANCH: {GIT_BRANCH}
+RECENT ERRORS: {RECENT_ERRORS}
+SESSION HISTORY: {SESSION_HISTORY}
+
+=== GENERATE CONTEXT ===
+Based on the session state, generate a brief (1-3 sentences) context note that includes:
+1. Current git branch (if available)
+2. Recent errors that Claude should be aware of (if any)
+3. Any workspace-specific context (e.g., project type based on files)
+
+Respond ONLY with valid JSON:
+{
+  "additionalContext": "<brief context note or null if nothing useful to add>",
+  "reasoning": "<why this context is helpful>"
+}
