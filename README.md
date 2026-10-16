@@ -1,52 +1,78 @@
+<div align="center">
+
 # Leash
 
-Observe and enforce Claude Code & Copilot CLI permission requests via LLM-based safety analysis. Web dashboard, system tray notifications, transcript browsing with token usage tracking, and multi-provider LLM support.
+### Leash the Harness
 
-**Core flow:** Claude Code / Copilot CLI &rarr; `curl` hook &rarr; `POST /api/hooks/{client}` &rarr; LLM safety analysis &rarr; approve/deny/passthrough
+**See what your coding agents are doing. Decide what they can do next.**
 
-**Default mode:** Observe-only. Hooks log events but return no decision. Enforcement can be toggled from the dashboard or via `--enforce`.
+LLM-assisted permission analysis for **Claude Code** and **GitHub Copilot CLI**, with a local dashboard, live logs, session transcripts, and desktop approvals.
 
-## Install & Run
+[Quick start](#quick-start) · [Feature tour](#feature-tour) · [Configuration](docs/configuration.md) · [Troubleshooting](#troubleshooting)
 
-### One-liner (any platform)
+![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?logo=fastapi&logoColor=white)
+![Platforms](https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux-555)
+
+</div>
+
+![Leash dashboard in dark mode: security profiles, enforcement modes, hook controls, and activity counters](docs/images/dashboard.png)
+
+*Actual Leash UI, populated with synthetic demo data. Screenshots show selected features, not default settings or measured performance. [Capture details](docs/images/README.md).*
+
+> [!IMPORTANT]
+> Leash starts in **Observe** mode: it records hook events without approving or denying them. It is an additional review layer, **not a sandbox or a guarantee of safety**. Keep your coding client's own permission controls enabled.
+
+## Why Leash?
+
+| Goal | What Leash provides |
+|------|---------------------|
+| Understand an approval | Tool input, safety score, reasoning, applied threshold, latency, and the response sent to the client |
+| Reduce routine prompts | Approve-Only mode to approve qualifying requests while leaving other decisions to you |
+| Apply a stricter policy | Enforce mode, per-tool handlers, security profiles, and optional desktop overrides |
+| Follow the whole session | Claude and Copilot transcripts, Claude subagent trees, tool diffs, and token usage |
+| Choose your analyzer | Seven providers: direct HTTP, one-shot CLIs, persistent processes, and configurable REST |
+| Tune without rebuilding | Editable prompts, per-client handlers, model selection, and live configuration |
+
+## Quick start
+
+**Prerequisites:** Python 3.11+, Git for a Git-based install, and `curl` on `PATH`. Install and sign in to the CLI used for analysis, or configure an HTTP provider. The initial analyzer is **Claude Stream**, model **`opus`**; monitoring Copilot does not automatically select a Copilot analyzer.
+
+With [uv](https://docs.astral.sh/uv/):
 
 ```bash
-# Run directly from GitHub (no install needed)
 uvx --from git+https://github.com/shahabmokhtari/leash leash
+```
 
-# Or install globally
+Or install a reusable command:
+
+```bash
 uv tool install git+https://github.com/shahabmokhtari/leash
 leash
 ```
 
-On the first interactive launch, Leash opens a small console installer so you can pick a security profile and enforcement mode before it installs hooks and starts.
+1. **Start in Observe.** On the first interactive launch, the console installer lets you select a profile and mode. The dashboard opens at **http://localhost:5050**.
+2. **Check Leash Settings.** Confirm the provider, model, and timeout. The default runtime hook target is Claude Code.
+3. **Use your coding client normally.** Open **Live Logs** to inspect a request and **Transcripts** to see the surrounding conversation.
+4. **Enable decisions deliberately.** Select **Approve Only** or **Enforce** on the dashboard after reviewing the results.
 
-### pip install
+> [!NOTE]
+> **Copilot setup has an extra step.** `--hooks copilot` and the dashboard install user-level files, which Copilot CLI may not read. Repository-local `.github/hooks/` files are the supported integration location. See [Copilot setup and limitations](docs/configuration.md#copilot-hooks).
+
+<details>
+<summary><strong>Other installation options: pip, source, and packaged binaries</strong></summary>
+
+### pip
 
 ```bash
 pip install git+https://github.com/shahabmokhtari/leash.git
 leash
 ```
 
-### Platform-specific with tray support
+The current package includes tray dependencies; the `tray` extra remains available:
 
-**Windows** (tray icon + toast notifications with approve/deny buttons):
-```powershell
-pip install "leash[tray] @ git+https://github.com/shahabmokhtari/leash.git"
-leash
-```
-
-**macOS**:
 ```bash
 pip install "leash[tray] @ git+https://github.com/shahabmokhtari/leash.git"
-leash
-```
-
-**Linux**:
-```bash
-pip install "leash[tray] @ git+https://github.com/shahabmokhtari/leash.git"
-leash
-# Optional: install notify-send and zenity for native notifications
 ```
 
 ### From source
@@ -58,187 +84,222 @@ uv sync --all-extras
 uv run leash
 ```
 
-### From release binary (no Python required)
+### Packaged binaries
 
-Download the latest release for your platform from [Releases](https://github.com/shahabmokhtari/leash/releases):
+When available, download a platform archive from [Releases](https://github.com/shahabmokhtari/leash/releases). A packaged binary does not require Python, but hook transport still needs `curl`, and CLI-backed analyzers still need their CLI.
 
-| Platform | Download |
-|----------|----------|
+| Platform | Archive |
+|----------|---------|
 | Windows | `leash-windows-amd64.zip` |
-| macOS (Intel) | `leash-macos-amd64.tar.gz` |
-| macOS (Apple Silicon) | `leash-macos-arm64.tar.gz` |
+| macOS, Intel | `leash-macos-amd64.tar.gz` |
+| macOS, Apple Silicon | `leash-macos-arm64.tar.gz` |
 | Linux | `leash-linux-amd64.tar.gz` |
 
-Extract and run:
+Extract, then run `.\leash.exe` on Windows, or `chmod +x leash` followed by `./leash` on macOS/Linux.
+
+</details>
+
+## How decisions work
+
+```mermaid
+flowchart LR
+    A["Claude Code / Copilot CLI"] --> B["Hook event via curl"]
+    B --> C["Match event, tool, and client"]
+    C --> D["Optional pre-validation"]
+    D --> E["LLM safety analysis"]
+    E --> F["Profile + enforcement mode"]
+    F --> G["Optional desktop decision"]
+    G --> H["Approve / deny / no opinion"]
+    F --> I["Logs + dashboard"]
+```
+
+The diagram shows the analysis path; log-only handlers and decisive pre-validation results can skip the LLM. A score is an analyzer's assessment from **0 to 100**, not a probability or a guarantee.
+
+### Modes and profiles are different controls
+
+**Mode** determines whether Leash acts on a decision. **Profile** selects the matched handler's threshold. Select mode cards directly on the dashboard.
+
+| Mode | Qualifying request | Below-threshold request | Interactive tray timeout |
+|------|--------------------|-------------------------|--------------------------|
+| **Observe** | No opinion (`{}`) | No opinion (`{}`) | Informational only |
+| **Approve Only** | Auto-approve | No opinion unless you decide through the tray | No opinion |
+| **Enforce** | Auto-approve | Deny by default; a desktop decision can override it | Deny |
+
+Approval also requires the handler's **Auto-approve** option. Observe mode's **LLM analysis** checkbox can skip analysis while retaining event logging; it removes LLM overhead, not all hook overhead.
+
+Profiles range from **Trust** and **Permissive** through **Moderate** and **Strict** to **Lockdown**. The handler editor exposes the **S/M/P/T** thresholds; Lockdown disables automatic approval. A profile name alone is not a substitute for checking the actual handler settings.
+
+**Error handling is not uniform.** Caught hook-processing exceptions return no opinion. A provider that returns an unsuccessful result instead produces an error score of 0; for `PreToolUse` in Enforce, this follows the default-deny path unless you override it. The timeout column above refers to the **desktop decision timeout**, not the LLM timeout. **Ignore** explicitly returns no opinion, including in Enforce.
+
+## Feature tour
+
+### Dashboard: control policy and spot patterns
+
+Switch profiles and modes, manage Claude/Copilot hooks, and opt into session auto-start. Below those controls, inspect today's approvals and denials, session counts, safety scores, latency statistics, seven-day trends, and score distributions.
+
+**Insights** surface recommendations. **Adaptive Thresholds** summarize decisions, overrides, and suggested thresholds; suggestions do **not** silently rewrite your policy.
+
+![Dashboard analytics with request latency, an insight, approval trends, score distribution, and per-tool statistics](docs/images/insights.png)
+
+### Live Logs: from a decision to its evidence
+
+Filter by **harness, hook type, tool, category, decision, and session**. Live refresh polls every five seconds and prepends new entries without rebuilding expanded rows.
+
+Expand an entry to see the request, LLM reasoning, score versus threshold, response JSON, and latency. Links take you to its handler, prompt template, or transcript. **Replay to LLM** reruns analysis using the current configuration; it does not execute the original tool, but it can send the input to your configured provider and incur usage.
+
+Export logs as **CSV or JSON**. The export action downloads server logs, not just the rows currently visible under the page's filters.
+
+![Live Logs showing filter chips and an expanded approval with request details, reasoning, response JSON, and replay](docs/images/live-logs.png)
+
+### Transcripts: browse sessions, subagents, and token usage
+
+Browse by **folder** or **repository**, then select a session. Claude and Copilot entries are labeled separately. Claude parent sessions expand to show subagents; session titles and branch information help you find the right conversation.
+
+Turn on **Show token usage** to calculate session and project totals. Model breakdowns and cache counters are available where the source transcript records them; these are usage counts, not a billing estimate.
+
+![Transcript browser showing Claude and Copilot sessions, an expanded subagent, and token totals](docs/images/sessions.png)
+
+Inside a session, toggle Markdown rendering, filter entry types, follow live SSE updates, and inspect side-by-side Edit diffs and collapsible tool results. Export all loaded transcript entries as **JSON or HTML**, including entries hidden by the viewer's type filters.
+
+<details>
+<summary><strong>See the transcript viewer and tool diff</strong></summary>
+
+![Transcript viewer with a user request, assistant explanation, side-by-side source edit, and linked tool result](docs/images/transcript.png)
+
+</details>
+
+### Prompt Editor: tune and test the analysis
+
+Edit bundled templates or create a `.txt` template for a specialized handler. Placeholders such as `{COMMAND}`, `{FILE_PATH}`, `{CWD}`, and `{SESSION_HISTORY}` supply request context.
+
+Use **Preview Prompt** for a browser-side preview, or **Send to LLM** to test with a tool name, working directory, and JSON input. The latter uses the saved template and active provider; **save edits before testing**. Preview is a convenience, not an exact reproduction of all backend substitutions.
+
+![Prompt Editor with the Bash template, available placeholders, and a test request](docs/images/prompts.png)
+
+### Leash Settings: configure providers and handlers
+
+Choose the provider and model, set analysis timeouts, and manage persistent-process limits. Each provider remembers its model selection. An explicitly empty CLI model lets the selected CLI choose its default.
+
+The **Hook Handlers** section controls event enablement, tool matchers, client targeting, handler mode, prompt template, automatic approval, and profile-specific thresholds. Configuration changes auto-save; **Claude Settings** and **Copilot Settings** are separate JSON editors for the underlying client files.
+
+<details>
+<summary><strong>See provider settings and the handler editor</strong></summary>
+
+![Leash Settings showing provider, model, timeout, and persistent-process limits](docs/images/settings.png)
+
+![Hook handler configuration showing event enablement, tool matchers, prompt templates, and per-profile thresholds](docs/images/handlers.png)
+
+</details>
+
+### Desktop decisions and built-in terminal
+
+Desktop notifications let you review requests without switching to the dashboard. Observe notifications are informational; Approve-Only and Enforce can present **Approve / Deny / Ignore** choices according to the platform.
+
+| Platform | Desktop integration |
+|----------|---------------------|
+| Windows | System tray plus toast or large popup decisions |
+| macOS | `osascript` notifications and dialogs |
+| Linux | `notify-send` for notifications; `zenity` for interactive dialogs |
+
+Desktop integration requires an available graphical session and platform tools. If it cannot initialize or is disabled, Leash continues without interactive desktop decisions.
+
+The dashboard's **Terminal** panel streams Leash's server output; it is a log viewer, not a command shell. Use it to diagnose provider startup, prompt tests, or hook processing.
+
+| Shortcut | Action |
+|----------|--------|
+| `D` | Toggle light/dark theme |
+| `R` | Refresh supported page data |
+| `1` / `2` / `3` | Dashboard / Live Logs / Leash Settings |
+| `T` | Toggle the terminal panel |
+| `?` / `Esc` | Show shortcuts where available / close the active panel or modal |
+
+## Choose an LLM provider
+
+The **monitored client** and the **analysis provider** are independent: a Claude-backed analyzer can evaluate Copilot requests, and vice versa.
+
+| Provider | `llm.provider` | How it runs |
+|----------|----------------|-------------|
+| Anthropic API | `anthropic-api` | Direct HTTP using an Anthropic API key |
+| Claude CLI | `claude-cli` | A new CLI subprocess for each query |
+| Claude ACP | `claude-persistent` | Persistent process using Agent Client Protocol |
+| Claude Stream **(default)** | `claude-stream` | Persistent `stream-json` process |
+| Copilot CLI | `copilot-cli` | A new Copilot subprocess for each query |
+| Copilot ACP | `copilot-persistent` | Persistent process using Agent Client Protocol |
+| Generic REST | `generic-rest` | Configurable URL, headers, JSON request template, and response path |
+
+Persistent providers reuse **processes**, with separate clients for monitored sessions and configurable idle/capacity limits. ACP rotates its conversation after the query limit; Stream restarts its process to clear accumulated context. Provider configuration changes recreate affected clients.
+
+See [provider configuration and examples](docs/configuration.md#llm-providers) for credentials, REST setup, session behavior, and timeout units.
+
+## Hook lifecycle and auto-start
+
+Regular runtime hooks are installed on startup according to your CLI choice and handler settings. Leash identifies its own hooks with a marker and preserves unrelated hooks. **Normal shutdown removes runtime hooks**; force-killing the process can prevent cleanup.
+
+The header's **play button** independently enables a **SessionStart auto-start hook**. This is opt-in, survives normal shutdown, and is removed only when you turn auto-start off. Copilot user-level auto-start is best-effort because of its hook-location limitation.
+
 ```bash
-# Windows
-.\leash.exe
-
-# macOS / Linux
-chmod +x leash
-./leash
+leash --enforce           # Start in Enforce (first-run installer selection takes precedence)
+leash --no-hooks          # Skip runtime hook installation at startup
+leash --hooks both        # Request Claude and Copilot user-level runtime hooks
+leash --port 8080         # Change listening port (default: 5050)
+leash --no-browser        # Do not open the dashboard automatically
+leash --config PATH       # Use a different configuration file
 ```
 
-## Quick Start
+`--hooks` accepts `claude`, `copilot`, `both`, or `none`. Do not combine `--no-hooks` with an installation target. These switches control startup installation; they are **not** an isolated demo mode.
 
-```bash
-leash                    # First interactive run shows setup, installs hooks, and records auto-start metadata
-leash --enforce          # Start in enforcement mode
-leash --no-hooks         # Start without installing hooks
-leash --hooks both       # Install Claude + Copilot hooks (default: claude). Choices: claude, copilot, both, none
-leash --port 8080        # Custom port (default: 5050)
-leash --host 0.0.0.0     # Custom bind host (default: localhost)
-leash --no-browser       # Don't open browser on startup
-leash --config PATH      # Custom config path (default: ~/.leash/config.json)
-```
+## Configuration and data
 
-On the first interactive startup, Leash saves the selected security profile and enforcement mode and installs Claude/Copilot runtime hooks. **Runtime hooks are removed automatically when Leash shuts down** so they never linger and error out when Leash is not running. The optional **SessionStart auto-start hook** is purely user-driven — install it from the dashboard (&9205; button) when you want Claude/Copilot to bring Leash back up automatically on the next session, and uninstall it the same way to turn it off. Settings (enforcement mode, security profile, LLM analysis toggle) persist across sessions.
+Configuration lives at **`~/.leash/config.json`**. Use **Leash Settings** for normal edits; consult the [configuration guide](docs/configuration.md) for JSON examples, pre-validation scripts, storage locations, and API access.
 
-## How It Works
+| Page | Local path |
+|------|------------|
+| Dashboard | `/` |
+| Live Logs | `/logs.html` |
+| Transcripts | `/transcripts.html` |
+| Prompt Editor | `/prompts.html` |
+| Leash Settings | `/config.html` |
+| Claude Settings | `/claude-settings.html` |
+| Copilot Settings | `/copilot-settings.html` |
 
-### Hook Architecture (curl-based, zero dependencies)
+> [!WARNING]
+> Keep Leash bound to **localhost**. Its APIs can expose transcripts, tool inputs, configuration, and operational controls. No API key is required by default. LLM analysis may send request context and session history to the selected provider; **Observe mode can still make LLM calls**.
+>
+> API-key middleware exists in the source but is **not registered by the application**. Setting `security.apiKey` or `LEASH_API_KEY` does not protect the running API. The bundled UI and generated runtime hooks also do not automatically send a key. Read the [privacy and access notes](docs/configuration.md#privacy-and-api-access).
 
-On startup, Leash writes to `~/.claude/settings.json`:
+## Troubleshooting
 
-```json
-{
-  "hooks": {
-    "PreToolUse": [{
-      "matcher": "Bash|Edit|Write",
-      "hooks": [{ "type": "command", "command": "curl -sS -X POST \"http://localhost:5050/api/hooks/claude?event=PreToolUse\" -H \"Content-Type: application/json\" -d @- # leash" }]
-    }]
-  }
-}
-```
-
-The `# leash` comment is a marker for clean uninstall (only removes our hooks, not yours).
-
-**Hook lifecycle:**
-
-- **Startup**: regular runtime hooks (PreToolUse, PostToolUse, etc.) are installed automatically based on your `hookHandlers` config.
-- **Shutdown**: Leash always removes its runtime hooks so the CLI never tries to call a hook endpoint that isn't running.
-- **SessionStart auto-start**: not installed automatically. Toggle it on from the dashboard when you want Claude/Copilot to launch Leash for you on the next session; toggle it off to remove it. The SessionStart entry is preserved across regular install/uninstall and across shutdowns until you explicitly turn it off.
-
-### Enforcement Modes
-
-| Mode | Safe requests | Unsafe requests | Tray behavior | Timeout |
-|------|--------------|----------------|---------------|---------|
-| **Observe** (default) | No opinion (`{}`) | No opinion (`{}`) | Informational alerts (no buttons) | N/A |
-| **Approve-Only** | Auto-approve | No opinion (`{}`) | Interactive (Approve/Deny/Ignore) | No opinion |
-| **Enforce** | Auto-approve | **Deny** | Interactive (user can override) | Deny |
-
-Dashboard button cycles: Observe &rarr; Approve-Only &rarr; Enforce &rarr; Observe.
-
-- **Observe**: Logs events, optionally runs LLM analysis, but never returns a decision. Tray shows informational-only alerts. LLM analysis can be toggled on/off from the dashboard (off = pure log-only with zero latency).
-- **Approve-only**: Auto-approves safe requests (score &ge; threshold). Unsafe requests return no opinion &mdash; Claude asks the user as normal. If tray is enabled, shows interactive Approve/Deny dialog for unsafe requests.
-- **Enforce**: Full control. Auto-approves safe, denies unsafe by default. If tray is enabled, shows interactive dialog so the user can override the deny. On timeout, the deny executes.
-
-### Auto-Start
-
-Leash can auto-start when Claude Code or Copilot begins a session, but only if you opt in. Toggle the play button (&9205;) in the dashboard header to install the SessionStart hook for Claude and Copilot; toggle it off to remove it. Leash never installs the SessionStart hook automatically, and never removes it on shutdown — it stays exactly as you toggled it.
-
-### LLM Providers
-
-| Provider | Config `llm.provider` | Description |
-|----------|----------------------|-------------|
-| Anthropic API | `anthropic-api` | Direct HTTP to Anthropic (fastest) |
-| Claude CLI | `claude-cli` | One-shot `claude` subprocess |
-| Claude Persistent (ACP) | `claude-persistent` | Persistent process via Agent Client Protocol |
-| Claude Stream | `claude-stream` | Persistent process via `--output-format stream-json` |
-| Copilot CLI | `copilot-cli` | GitHub Copilot CLI subprocess |
-| Copilot Persistent (ACP) | `copilot-persistent` | Persistent process via ACP |
-| Generic REST | `generic-rest` | Any REST LLM API (OpenAI, local, etc.) |
-
-Persistent providers (`claude-persistent`, `claude-stream`, `copilot-persistent`) reuse sessions across queries, eliminating per-query session overhead. The provider is automatically recreated when the model config changes. If the model field is empty, the CLI uses its built-in default.
-
-### System Tray & Notifications
-
-Tray notifications work in all three enforcement modes:
-- **Observe**: Informational alerts only (no buttons)
-- **Approve-only**: Interactive Approve/Deny/Ignore for unsafe requests
-- **Enforce**: Interactive dialog showing system deny, user can override
-
-Platform support:
-- **Windows**: System tray icon (pystray) + toast/popup notifications with interactive Approve/Deny/Ignore buttons
-- **macOS**: Native notifications via osascript with Approve/Deny dialogs
-- **Linux**: notify-send for alerts, zenity for interactive Approve/Deny dialogs
-
-Install with `pip install "leash[tray]"` to enable.
-
-## Web Dashboard
-
-| Page | URL | Features |
-|------|-----|----------|
-| Dashboard | `/` | Stats, charts, profiles, insights, hooks install/enforce toggles |
-| Live Logs | `/logs.html` | 6 filters, incremental updates, export CSV/JSON, link to transcripts |
-| Transcripts | `/transcripts.html` | Hierarchical session tree (parent + subagents), token usage per session/project, SSE live stream, markdown rendering, tool diffs |
-| Prompt Editor | `/prompts.html` | Edit LLM prompt templates |
-| Configuration | `/config.html` | Service config + hook handler management |
-| Claude Settings | `/claude-settings.html` | JSON editor for `~/.claude/settings.json` |
-| Copilot Settings | `/copilot-settings.html` | JSON editor for `~/.copilot/hooks/hooks.json` |
-
-### Transcript Features
-
-- **Hierarchical sessions**: Parent sessions with expandable subagent children (Claude Code Agent tool)
-- **Token usage tracking**: Per-session and per-project token counts with model breakdown (Claude + Copilot)
-- **CWD from JSONL**: Project grouping uses actual working directory from transcript metadata
-- **Live streaming**: SSE-based real-time transcript updates
-- **Rich rendering**: Markdown, side-by-side diffs for Edit/Write tools, collapsible tool results
-
-## Configuration
-
-Config auto-created at `~/.leash/config.json`. All settings persist across sessions:
-
-```json
-{
-  "llm": { "provider": "claude-stream", "model": "opus", "timeout": 30000 },
-  "server": { "port": 5050, "host": "localhost" },
-  "security": { "apiKey": null, "rateLimitPerMinute": 600 },
-  "profiles": { "activeProfile": "moderate" },
-  "enforcementMode": "observe",
-  "analyzeInObserveMode": true,
-  "tray": {
-    "enabled": true,
-    "showInObserve": true,
-    "showInApproveOnly": true,
-    "interactiveTimeoutSeconds": 10,
-    "sound": false,
-    "useLargePopup": true
-  }
-}
-```
+| Symptom | Check |
+|---------|-------|
+| No events in Live Logs | Hook installation status, the correct client, enabled events/handlers, `curl` on `PATH`, and the service's port |
+| Copilot shows installed but sends nothing | Use repository-local hooks; the dashboard badge describes user-level files, not verified execution |
+| Requests still ask for permission | Observe is the default. In Approve-Only, below-threshold or failed analysis returns control to the client |
+| LLM errors or slow requests | Provider login/key, selected model, Terminal output, and `llm.timeout` in **milliseconds** |
+| No popup appears | `tray.enabled`, per-mode visibility, OS notifications, graphical-session availability, and platform dependencies |
+| Need remote or multi-user access | The bundled app does not activate API-key authentication; keep it local rather than relying on the key settings |
+| Empty transcript browser or missing token counts | Existing client transcript files and their metadata; not every client/model records every token field |
+| Hooks remain after a crash | Start Leash and shut it down normally, or remove only Leash-marked entries; preserve your other hooks |
 
 ## Development
 
 ```bash
-uv sync --all-extras        # Install all deps including dev
-uv run pytest -v            # Run tests
-uv run ruff check src/ tests/  # Lint
-uv run leash               # Run from source
+uv sync --all-extras
+uv run pytest tests/ -x --tb=short -q
+uv run ruff check src/ tests/ docs/capture_screenshots.py
+uv run leash
 ```
 
-## Tech Stack
+| Area | Location / technology |
+|------|-----------------------|
+| Backend | `src/leash/` · FastAPI, Uvicorn, Pydantic v2 |
+| Hook decisions | `src/leash/routes/`, `src/leash/handlers/` |
+| Providers, sessions, tray | `src/leash/services/` |
+| Frontend | `static/` · vanilla HTML/CSS/JS, no frontend build step |
+| Prompt templates | `prompts/` |
+| Tests | `tests/` · pytest + pytest-asyncio |
+| Packaging | `pyproject.toml`, `uv.lock` · uv + hatchling |
 
-| Layer | Technology |
-|-------|-----------|
-| Web framework | FastAPI + Uvicorn |
-| Models | Pydantic v2 (camelCase aliases) |
-| HTTP client | httpx |
-| SSE | sse-starlette |
-| File watching | watchfiles |
-| Tray (optional) | pystray + Pillow + windows-toasts |
-| Frontend | Vanilla HTML/CSS/JS (zero dependencies) |
-| Testing | pytest + pytest-asyncio + pytest-mock |
-| Package mgmt | uv + pyproject.toml + hatchling |
-| CI/CD | GitHub Actions (test + release) |
-
-## Security
-
-- ASGI middleware pipeline: Security Headers &rarr; Rate Limiting (600/min) &rarr; API Key Auth
-- Input sanitization, path traversal protection
-- LLM prompt injection defense
-- CORS localhost-only
-- Hook error safety: any error returns `{}` (no opinion)
+See [CLAUDE.md](CLAUDE.md) for contributor architecture and workflow, and [screenshot instructions](docs/images/README.md) for refreshing the feature tour.
 
 ## Contributing
 
